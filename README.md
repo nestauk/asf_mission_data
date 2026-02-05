@@ -1,28 +1,67 @@
-# asf_mission_data
+# ASF Mission Data Tool
 
-## Setup
+ETL pipelines for the ASF Policy Dashboard.
 
-This project uses [`uv`](https://docs.astral.sh/uv/) for virtual environment management. If you are new to `uv`, you can find the [quickstart guide here](https://docs.astral.sh/uv/getting-started/).
+## Quick start
 
-We also utilise `direnv` via the `.envrc` file to automatically:
+### Prerequisites
 
-- Import your environment variables from `.env`
-- Activate your virtual environment (_only if you comment out the relevant lines in `.envrc`_)
+- Python 3.11+
+- [uv](https://github.com/astral-sh/uv) (recommended) or pip
 
-After installing `direnv` and `uv` on your system (we recommend doing this via [`brew`](https://brew.sh/) on macOS), you **must** run the following commands in your terminal to set up the project:
+### Installation
 
 ```bash
-direnv allow
-uv sync
-uv run pre-commit install --install-hooks
+# Clone the repo
+git clone https://github.com/nestauk/asf_mission_data_tool.git
+cd asf_mission_data_tool
+
+# Create virtual environment and install dependencies
+uv venv
+source .venv/bin/activate
+uv pip install -e ".[dev]"
 ```
 
-## Contributor guidelines
+### Running pipelines locally
 
-[Technical and working style guidelines](https://github.com/nestauk/ds-cookiecutter/blob/master/GUIDELINES.md)
+*(TODO: This isn't working yet)*
 
----
+```bash
+# Set local data root (pipelines will read/write here instead of S3)
+export DATA_ROOT=/tmp/pipeline-dev
 
-<small><p>Project based on <a target="_blank" href="https://github.com/nestauk/ds-cookiecutter">Nesta's data science project template</a>
-(<a href="http://nestauk.github.io/ds-cookiecutter">Read the docs here</a>).
-</small>
+# Run the example pipeline
+python -m asf_mission_data_tool.pipeline.example.handler
+
+# Check output
+ls /tmp/pipeline-dev/
+```
+
+## Project structure
+
+```
+asf_data_hub/           # Python package
+├── storage.py          # Storage abstraction (local/S3)
+├── alerting.py         # Slack alerting utilities
+└── pipeline/           # Pipeline implementations
+    ├── example/        # Template pipeline
+    └── energy_cap/     # Energy price cap pipeline
+infrastructure/         # CloudFormation templates
+tests/                  # Test suite
+```
+
+## Creating a new pipeline
+
+See [docs/creating-a-pipeline.md](docs/creating-a-pipeline.md) *(TODO)*
+
+## Pipeline registry
+
+All pipelines are registered in `pipelines.yaml`. Update this file when adding a new pipeline.
+
+## Deployment
+
+*(TODO: Document CI/CD workflow)*
+
+## Runbook
+
+See [docs/runbook.md](docs/runbook.md) for operational procedures.
