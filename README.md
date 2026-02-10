@@ -1,4 +1,4 @@
-# ASF Mission Data Tool
+# ASF Mission Data
 
 ETL pipelines for the ASF Policy Dashboard.
 
@@ -6,53 +6,66 @@ ETL pipelines for the ASF Policy Dashboard.
 
 ### Prerequisites
 
-- Python 3.11+
-- [uv](https://github.com/astral-sh/uv) (recommended) or pip
+- Python 3.12+ (uv will install this automatically if needed)
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) for dependency management
 
 ### Installation
 
 ```bash
 # Clone the repo
-git clone https://github.com/nestauk/asf_mission_data_tool.git
-cd asf_mission_data_tool
+git clone https://github.com/nestauk/asf_mission_data.git
+cd asf_mission_data
 
-# Create virtual environment and install dependencies
-uv venv
+# Install dependencies (creates .venv automatically)
+uv sync
+
+# Activate virtual environment
 source .venv/bin/activate
-uv pip install -e ".[dev]"
+
+# Or run commands directly without activating
+uv run python -m asf_mission_data.pipeline.example.handler
 ```
 
 ### Running pipelines locally
-
-*(TODO: This isn't working yet)*
 
 ```bash
 # Set local data root (pipelines will read/write here instead of S3)
 export DATA_ROOT=/tmp/pipeline-dev
 
 # Run the example pipeline
-python -m asf_mission_data_tool.pipeline.example.handler
+uv run python -m asf_mission_data.pipeline.example.handler
 
 # Check output
 ls /tmp/pipeline-dev/
 ```
 
+Or use the `.env.example` file:
+
+```bash
+cp .env.example .env
+source .env
+uv run python -m asf_mission_data.pipeline.example.handler
+```
+
 ## Project structure
 
 ```
-asf_data_hub/           # Python package
-├── storage.py          # Storage abstraction (local/S3)
-├── alerting.py         # Slack alerting utilities
-└── pipeline/           # Pipeline implementations
-    ├── example/        # Template pipeline
-    └── energy_cap/     # Energy price cap pipeline
-infrastructure/         # CloudFormation templates
-tests/                  # Test suite
+asf_mission_data/           # Python package (pipeline code)
+├── storage.py              # Storage abstraction (local/S3)
+├── alerting.py             # Slack alerting utilities
+└── pipeline/               # Pipeline implementations
+    └── example/            # Template pipeline
+infrastructure/             # CloudFormation templates
+├── core/                   # Shared resources (S3, IAM)
+└── pipeline/               # Per-pipeline template
+tests/                      # Test suite
+docs/                       # Documentation and runbooks
+scripts/                    # Utility scripts
 ```
 
 ## Creating a new pipeline
 
-See [docs/creating-a-pipeline.md](docs/creating-a-pipeline.md) *(TODO)*
+*(TODO: Document after Hamilton spike — see docs/creating-a-pipeline.md)*
 
 ## Pipeline registry
 
@@ -64,4 +77,4 @@ All pipelines are registered in `pipelines.yaml`. Update this file when adding a
 
 ## Runbook
 
-See [docs/runbook.md](docs/runbook.md) for operational procedures.
+*(TODO: Agree on doc strategy)*
