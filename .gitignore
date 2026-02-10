@@ -51,7 +51,7 @@ Thumbs.db
 # Logs
 *.log
 
-# Cookie cutter 
+# Cookie cutter
 # TODO: (can remove once migration is fully complete)
 .recipes/
 .cookiecutter/state/
