@@ -1,0 +1,15 @@
+# ASF Mission Data Hub Pipeline Registry
+#
+# This file is the source of truth for what pipelines exist.
+# Update this file when adding a new pipeline.
+#
+# The health check Lambda will read this to know what schedules to expect.
+
+pipelines:
+  example:
+    owner: alexandra
+    schedule: never  # Template only, not scheduled
+    description: Example pipeline demonstrating conventions
+    source_url: n/a
+    stages: [bronze, silver]
+    stack_name: n/a

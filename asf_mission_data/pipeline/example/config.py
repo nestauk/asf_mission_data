@@ -1,0 +1,3 @@
+# TBC Individual config for pipeline in this file
+# Source URLs, versions, table metadata, etc.
+# Pipeline-specific config frozen dataclass
