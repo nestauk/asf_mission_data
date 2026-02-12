@@ -17,6 +17,7 @@ dependencies = [
     "s3fs>=2024.2.0",
     "requests>=2.31.0",
     "pyyaml>=6.0.0",
+    "sf-hamilton[lsp,visualization]>=1.89.0",
 ]
 
 [project.urls]
