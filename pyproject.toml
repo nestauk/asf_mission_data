@@ -17,6 +17,9 @@ dependencies = [
     "s3fs>=2024.2.0",
     "requests>=2.31.0",
     "pyyaml>=6.0.0",
+    "beautifulsoup4>=4.14.3",
+    "sf-hamilton[visualization]>=1.89.0",
+    "boto3>=1.42.49",
 ]
 
 [project.urls]
@@ -31,6 +34,7 @@ dev = [
     "mypy>=1.8.0",
     "pandas-stubs>=2.0.0",
     "pre-commit>=3.6.0",
+    "ipykernel>=7.2.0",
 ]
 
 [tool.hatch.build.targets.wheel]
