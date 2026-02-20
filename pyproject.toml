@@ -17,6 +17,8 @@ dependencies = [
     "s3fs>=2024.2.0",
     "requests>=2.31.0",
     "pyyaml>=6.0.0",
+    "sf-hamilton>=1.89.0",
+    "boto3>=1.42.42",
 ]
 
 [project.urls]
@@ -31,6 +33,14 @@ dev = [
     "mypy>=1.8.0",
     "pandas-stubs>=2.0.0",
     "pre-commit>=3.6.0",
+    "ipykernel>=7.2.0",
+    "jupyterlab>=4.5.4",
+    "marimo>=0.19.11",
+    "sf-hamilton[lsp,visualization]>=1.89.0",
+    "boto3-stubs[cloudformation,lambda,s3]>=1.42.53",
+    "types-pyyaml>=6.0.12.20250915",
+    "types-requests>=2.32.4.20260107",
+    "pytest-mock>=3.15.1",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -67,8 +77,15 @@ docstring-code-line-length = "dynamic"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+addopts = "--cov=asf_mission_data --cov-report=term-missing"
+
+[tool.coverage.report]
+omit = ["tests/*"]
 
 [tool.mypy]
 python_version = "3.12"
 warn_return_any = true
 warn_unused_ignores = true
+disallow_untyped_defs = true
+disallow_any_generics = true
+ignore_missing_imports = true
