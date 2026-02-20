@@ -1,21 +1,18 @@
 name: pre-commit
-
 on:
   pull_request:
   push:
-    branches: [main, dev]
-
+    branches: [dev]
 jobs:
   pre-commit:
     runs-on: ubuntu-latest
+    env:
+      SKIP: no-commit-to-branch
     steps:
       - uses: actions/checkout@v5
-
       - name: Install uv
         uses: astral-sh/setup-uv@v6
-
-      - name: Set up pre-commit
-        run: uv tool install pre-commit
-
       - name: Run pre-commit on all files
-        run: uv run pre-commit run --all-files
+        run: |
+          uv sync --group dev
+          uv run pre-commit run --all-files
