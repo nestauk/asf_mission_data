@@ -1,16 +1,14 @@
 import json
-from pathlib import Path
-
 import re
-from bs4 import BeautifulSoup
+from pathlib import Path
 from urllib.parse import urljoin
+
+from bs4 import BeautifulSoup
 
 from asf_mission_data import storage, utils
 
 # Regex pattern for expected price cap period dates format
-PRICE_CAP_PERIOD_PATTERN = re.compile(
-    r"\d{1,2}\s+[A-Za-z]+\s+to\s+\d{1,2}\s+[A-Za-z]+\s+\d{4}"
-)
+PRICE_CAP_PERIOD_PATTERN = re.compile(r"\d{1,2}\s+[A-Za-z]+\s+to\s+\d{1,2}\s+[A-Za-z]+\s+\d{4}")
 
 
 def latest_file_url(collection_url: str, file_link_text: str) -> str:
@@ -133,8 +131,7 @@ def provenance_metadata(
         "price_cap_period": latest_price_cap_period,
         "bronze_ingest_timestamp": bronze_ingest_timestamp,
         "pipeline_version": pipeline_version,
-        "citation": f"Source: {publisher}, {latest_file_name}, "
-        f"{latest_price_cap_period}. {collection_url}.",
+        "citation": f"Source: {publisher}, {latest_file_name}, {latest_price_cap_period}. {collection_url}.",
     }
 
 

@@ -2,9 +2,9 @@
 # Driver construction for hamilton
 
 import logging
-
 from datetime import datetime, timezone
 from importlib.metadata import version
+
 from hamilton import driver
 
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9 import bronze
@@ -39,9 +39,7 @@ def build_bronze_driver() -> driver.Builder:
                 "file_link_text": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["file_link_text"],
                 "publisher": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["publisher"],
                 "pipeline_version": version("asf-mission-data"),
-                "bronze_ingest_timestamp": datetime.now(timezone.utc).strftime(
-                    "%Y-%m-%d %H:%M:%S"
-                ),
+                "bronze_ingest_timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
             }
         )
         .build()

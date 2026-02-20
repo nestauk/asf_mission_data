@@ -1,9 +1,10 @@
 """Storage path utilities for local and S3 data access."""
 
-import os
-import boto3
 import logging
+import os
 from pathlib import Path
+
+import boto3
 
 logger = logging.getLogger(__name__)
 
@@ -83,9 +84,7 @@ def _cleanup_local_folder(folder: Path, delete_extension: str | None) -> None:
     """
     deleted_files = []
     for existing_file in folder.iterdir():
-        if existing_file.is_file() and (
-            delete_extension is None or existing_file.name.endswith(delete_extension)
-        ):
+        if existing_file.is_file() and (delete_extension is None or existing_file.name.endswith(delete_extension)):
             existing_file.unlink()
             deleted_files.append(existing_file.name)
     if deleted_files:
@@ -162,9 +161,7 @@ def _save_local_file(file_path: Path, content: bytes | str, mode: str) -> None:
     logger.info("Saved local file: %s", file_path)
 
 
-def _save_s3_file(
-    s3_client: boto3.client, bucket: str, key: str, content: bytes | str, mode: str
-) -> None:
+def _save_s3_file(s3_client: boto3.client, bucket: str, key: str, content: bytes | str, mode: str) -> None:
     """Save content to an S3 bucket at the specified key.
 
     Args:
@@ -225,7 +222,6 @@ def save_file_with_cleanup(
         base_path.mkdir(parents=True, exist_ok=True)
 
     for subdir in subdirs:
-
         if is_s3:
             key_prefix = f"{base_prefix}/{subdir}".strip("/")
             if cleanup_subdir and subdir == cleanup_subdir:
