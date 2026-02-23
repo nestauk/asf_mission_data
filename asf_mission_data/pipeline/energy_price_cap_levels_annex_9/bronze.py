@@ -7,20 +7,50 @@ from bs4 import BeautifulSoup
 
 from asf_mission_data import storage, utils
 
+# Path parameters
+BASE_PATH = storage.get_data_path("energy_price_cap_levels_annex_9/bronze")
+is_s3 = utils.is_s3_uri(BASE_PATH)
+if is_s3:
+    BUCKET, BASE_PREFIX = utils.parse_s3_uri(BASE_PATH)
+    S3_PREFIX_LATEST = f"{BASE_PREFIX}/latest"
+    S3_PREFIX_HISTORICAL = f"{BASE_PREFIX}/historical"
+else:
+    LOCAL_DIR_LATEST = f"{BASE_PATH}/latest"
+    LOCAL_DIR_HISTORICAL = f"{BASE_PATH}/historical"
+
+
 # Regex pattern for expected price cap period dates format
-PRICE_CAP_PERIOD_PATTERN = re.compile(r"\d{1,2}\s+[A-Za-z]+\s+to\s+\d{1,2}\s+[A-Za-z]+\s+\d{4}")
+PRICE_CAP_PERIOD_PATTERN = re.compile(
+    r"\d{1,2}\s+[A-Za-z]+\s+to\s+\d{1,2}\s+[A-Za-z]+\s+\d{4}"
+)
 
 
-def latest_file_url(collection_url: str, file_link_text: str) -> str:
-    """Locate the latest dataset file URL from a publisher collection page.
-
-    Fetches and parses the HTML content at the given collection URL and searches
-    for an anchor tag where visible text contains the specified 'file_link_text'.
-    Returns the URL of the first match.
+def latest_collection_page_html_soup(collection_url: str) -> BeautifulSoup:
+    """Fetch and parse the HTML content of a data publisher's collection page.
 
     Args:
         collection_url (str): URL of page containing links to downloadable data files.
+
+    Returns:
+        BeautifulSoup: Parsed HTML content of the page.
+    """
+    return BeautifulSoup(utils.fetch_raw_content(collection_url), "html.parser")
+
+
+def latest_file_url(
+    latest_collection_page_html_soup: BeautifulSoup,
+    file_link_text: str,
+    collection_url: str,
+) -> str:
+    """Locate the URL of the latest data file from a parsed collection page.
+
+    Searches for an anchor tag whose visible text contains the specified
+    substring 'file_link_text' and returns the URL of the first match.
+
+    Args:
+        latest_collection_page_html_soup (BeautifulSoup): Parsed HTML of the collection page.
         file_link_text (str): Substring expected to appear in the link text of target data file.
+        collection_url (str): URL of page containing links to downloadable data files.
 
     Raises:
         ValueError: If no matching link is found on the page.
@@ -29,23 +59,22 @@ def latest_file_url(collection_url: str, file_link_text: str) -> str:
         str: URL of the first matching data file link.
     """
 
-    soup = BeautifulSoup(utils.fetch_raw_content(collection_url), "html.parser")
-
-    for a in soup.find_all("a", href=True):
+    for a in latest_collection_page_html_soup.find_all("a", href=True):
         if file_link_text in a.get_text():
             return urljoin(collection_url, a["href"])
 
     raise ValueError(f"Could not find dataset '{file_link_text}' at {collection_url}")
 
 
-def latest_price_cap_period(collection_url: str) -> str:
+def latest_price_cap_period(latest_collection_page_html_soup: BeautifulSoup) -> str:
     """Extract the latest energy price cap period from given collection page.
 
-    Fetches the HTML content at given collection URL, searches all h2 and h3 headings for
-    a text pattern matching "D Month to D Month YYYy" and returns the first match.
+    Searches all <h2> and <h3> headings in the given BeautifulSoup object for
+    a text pattern matching the price cap period (e.g., "1 January to 31 March 2026")
+    and returns the first match.
 
     Args:
-        collection_url (str): URL of page containing links to downloadable data files.
+        latest_collect_page_html_soup (BeautifulSoup): Parsed HTML of the collection page.
 
     Raises:
         ValueError: If no matching period is found on the page.
@@ -54,9 +83,7 @@ def latest_price_cap_period(collection_url: str) -> str:
         str: Latest price cap period (e.g., "1 January to 31 March 2026").
     """
 
-    soup = BeautifulSoup(utils.fetch_raw_content(collection_url), "html.parser")
-
-    for heading in soup.find_all(["h2", "h3"]):
+    for heading in latest_collection_page_html_soup.find_all(["h2", "h3"]):
         match = PRICE_CAP_PERIOD_PATTERN.search(heading.get_text(strip=True))
         if match:
             return match.group(0)
@@ -95,7 +122,7 @@ def latest_file_name(
     return Path(latest_file_url).name
 
 
-def provenance_metadata(
+def bronze_metadata(
     publisher: str,
     collection_url: str,
     latest_file_url: str,
@@ -135,87 +162,195 @@ def provenance_metadata(
     }
 
 
-def saved_file_path(
+def saved_bronze_excel_file(
     latest_file_content: bytes,
     latest_file_name: str,
     latest_price_cap_period: str,
-) -> dict[str, Path]:
-    """Save the latest raw data file to both the LATEST and historical directories.
+) -> tuple[str, str]:
+    """Save the latest Excel file to both "latest" and "historical" storage locations.
 
-    This function ensures that:
-    - The file is saved in the "LATEST" subdirectory, replacing any raw .xlsx files.
-    - The file is also saved in a "historical/{latest_price_cap_period}" subdirectory to
-        preserve past versions.
-    - Only files ending with ".xlsx" in LATEST are deleted before saving the new file.
-        This is to prevent deleting metadata files, which are treated separately.
+    Depending on storage configuration (`is_s3`), the function either:
+    - S3 storage: Uploads file to S3 bucket under a "latest" key (replacing any existing objects)
+        and a "historical" key organised by price cap period.
+    - Local storage: writes file to local directories under a "latest" subdirectory (replacing any existing files)
+        and a "historical" subdirectory organised by price cap period.
 
     Args:
-        latest_file_content (bytes): Raw content of latest data file.
-        latest_file_name (str): Name of latest data file (e.g., "Annex-9-Levelisation-allowance-methodology-and-levelised-cap-levels-v1.8.xlsx").
-        latest_price_cap_period (str): Price cap period string (e.g., "1 January to 31 March 2026") used to create this historical subdirectory.
+        latest_file_content (bytes): Content of Excel file in bytes.
+        latest_file_name (str): Name of file, including extension.
+        latest_price_cap_period (str): Price cap period string, extracted directly from Ofgem collection page.
 
     Returns:
-        dict[str, Path]: Paths to the saved files, keyed by:
-            - "latest": Path to file in the LATEST directory.
-            - "historical": Path to the file in the historical directory.
+        tuple[str, str]: Tuple containing the paths or S3 URIs of the saved files to "latest" and to "historical".
     """
+    price_cap_period_prefix = latest_price_cap_period.replace(" ", "_")
+    if is_s3:
+        latest_key = f"{S3_PREFIX_LATEST}/raw/{latest_file_name}"
+        historical_key = (
+            f"{S3_PREFIX_HISTORICAL}/{price_cap_period_prefix}/raw/{latest_file_name}"
+        )
 
-    base_path = storage.get_data_path("energy_price_cap_levels_annex_9/bronze")
+        storage.delete_s3_objects_with_prefix(
+            bucket=BUCKET, prefix=f"{S3_PREFIX_LATEST}/raw"
+        )
+        storage.save_s3_object(
+            bucket=BUCKET,
+            key=latest_key,
+            content=latest_file_content,
+        )
+        storage.save_s3_object(
+            bucket=BUCKET,
+            key=historical_key,
+            content=latest_file_content,
+        )
+        return f"s3://{BUCKET}/{latest_key}", f"s3://{BUCKET}/{historical_key}"
+    else:
+        latest_path = f"{LOCAL_DIR_LATEST}/raw/{latest_file_name}"
+        historical_path = (
+            f"{LOCAL_DIR_HISTORICAL}/{price_cap_period_prefix}/raw/{latest_file_name}"
+        )
 
-    saved_paths = storage.save_file_with_cleanup(
-        content=latest_file_content,
-        base_path=base_path,
-        subdirs=["LATEST", f"historical/{latest_price_cap_period}"],
-        file_name=latest_file_name,
-        delete_extension=".xlsx",
-        cleanup_subdir="LATEST",
-        mode="wb",
-    )
-    return {
-        "latest": saved_paths["LATEST"],
-        "historical": saved_paths[f"historical/{latest_price_cap_period}"],
-    }
+        storage.delete_files_in_directory(f"{LOCAL_DIR_LATEST}/raw")
+        storage.save_local_file(
+            file_path=latest_path,
+            content=latest_file_content,
+        )
+        storage.save_local_file(
+            file_path=historical_path,
+            content=latest_file_content,
+        )
+        return latest_path, historical_path
 
 
-def saved_provenance_metadata_file_path(
+def saved_bronze_metadata(
     latest_file_name: str,
-    provenance_metadata: dict[str, str],
+    bronze_metadata: dict[str, str],
     latest_price_cap_period: str,
-) -> dict[str, str]:
-    """Save the latest metadata file accompanying the latest raw data file to both the LATEST and historical directories.
+) -> tuple[str, str]:
+    """Save the provenance metadata for the latest Excel file to both "latest" and "historical" storage locations.
 
-    This function ensures that:
-    - The file is saved in the "LATEST" subdirectory, replacing any metadata files.
-    - The file is also saved in a "historical/{latest_price_cap_period}" subdirectory to
-        preserve past versions.
-    - Only files ending with ".metadata.json" in LATEST are deleted before saving the new file.
-        This is to prevent deleting raw data files, which are treated separately.
+    Depending on storage configuration (`is_s3`), the function either:
+    - S3 storage: Uploads file to S3 bucket under a "latest" key (replacing any existing objects)
+        and a "historical" key organised by price cap period.
+    - Local storage: writes file to local directories under a "latest" subdirectory (replacing any existing files)
+        and a "historical" subdirectory organised by price cap period.
 
     Args:
-        latest_file_name (str): Name of latest data file (e.g., "Annex-9-Levelisation-allowance-methodology-and-levelised-cap-levels-v1.8.xlsx").
-        provenance_metadata (dict[str, str]): Dictionary of metadata about the data file.
-        latest_price_cap_period (str): Price cap period string (e.g., "1 January to 31 March 2026") used to create this historical subdirectory.
+        latest_file_name (str): Name of latest Excel file, including extension.
+        bronze_metadata (dict[str, str]): Dictionary of metadata about latest Excel file.
+        latest_price_cap_period (str): Price cap period string, extracted directly from Ofgem collection page.
 
     Returns:
-        dict[str, Path]: Paths to the saved metadata files, keyed by:
-            - "latest": Path to file in the LATEST directory.
-            - "historical": Path to the file in the historical directory.
+        tuple[str, str]: Tuple containing the paths or S3 URIs of the saved metadata files to "latest" and to "historical".
     """
 
-    base_path = storage.get_data_path("energy_price_cap_levels_annex_9/bronze")
     metadata_file_name = f"{latest_file_name}.metadata.json"
+    metadata_json = json.dumps(bronze_metadata, indent=4)
 
-    saved_paths = storage.save_file_with_cleanup(
-        content=json.dumps(provenance_metadata, indent=4),
-        base_path=base_path,
-        subdirs=["LATEST", f"historical/{latest_price_cap_period}"],
-        file_name=metadata_file_name,
-        delete_extension=".metadata.json",
-        cleanup_subdir="LATEST",
-        mode="w",
-    )
+    price_cap_period_prefix = latest_price_cap_period.replace(" ", "_")
 
-    return {
-        "latest": saved_paths["LATEST"],
-        "historical": saved_paths[f"historical/{latest_price_cap_period}"],
-    }
+    if is_s3:
+        latest_key = f"{S3_PREFIX_LATEST}/metadata/{metadata_file_name}"
+        historical_key = f"{S3_PREFIX_HISTORICAL}/{price_cap_period_prefix}/metadata/{metadata_file_name}"
+
+        storage.delete_s3_objects_with_prefix(
+            bucket=BUCKET, prefix=f"{S3_PREFIX_LATEST}/metadata"
+        )
+        storage.save_s3_object(
+            bucket=BUCKET,
+            key=latest_key,
+            content=metadata_json,
+        )
+        storage.save_s3_object(
+            bucket=BUCKET,
+            key=historical_key,
+            content=metadata_json,
+        )
+
+        return f"s3://{BUCKET}/{latest_key}", f"s3://{BUCKET}/{historical_key}"
+
+    else:
+        latest_path = f"{LOCAL_DIR_LATEST}/metadata/{metadata_file_name}"
+        historical_path = f"{LOCAL_DIR_HISTORICAL}/{price_cap_period_prefix}/metadata/{metadata_file_name}"
+
+        storage.delete_files_in_directory(f"{LOCAL_DIR_LATEST}/metadata")
+
+        storage.save_local_file(
+            file_path=latest_path,
+            content=metadata_json,
+        )
+        storage.save_local_file(
+            file_path=historical_path,
+            content=metadata_json,
+        )
+        return latest_path, historical_path
+
+
+def saved_dag_visualisation(
+    accompanying_file_name: str,
+    subdir_or_prefix: str,
+    dag_image: bytes,
+    latest_price_cap_period: str,
+) -> tuple[str, str]:
+    """Save DAG visualisation image representing the workflow that produces a specific file.
+
+    The `accompanying_file_name` identifies the file that the DAG describes.
+
+    Depending on storage configuration (`is_s3`), the function either:
+    - S3 storage: Uploads image to S3 bucket under a "latest" key (replacing any existing objects)
+        and a "historical" key organised by price cap period.
+    - Local storage: writes image to local directories under a "latest" subdirectory (replacing any existing files)
+        and a "historical" subdirectory organised by price cap period.
+
+    Args:
+        accompanying_file_name (str): Name of the file that the DAG visualises.
+        subdir_or_prefix (str): Subdirectory (local)o key prefix (S3) under which the DAG
+            image should be saved. Typically the subdirectory/prefix where the accompanying file is located.
+        dag_image (bytes): DAG visualisation image.
+        latest_price_cap_period (str): Price cap period string, extracted directly from Ofgem collection page.
+
+    Returns:
+        tuple[str, str]: Tuple containing the paths or S3 URIs of the saved DAG images to "latest" and to "historical".
+    """
+    dag_file_name = f"{accompanying_file_name}.dag.png"
+    price_cap_period_prefix = latest_price_cap_period.replace(" ", "_")
+
+    if is_s3:
+        latest_key = f"{S3_PREFIX_LATEST}/{subdir_or_prefix}/dag_image/{dag_file_name}"
+        historical_key = f"{S3_PREFIX_HISTORICAL}/{price_cap_period_prefix}/{subdir_or_prefix}/dag_image/{dag_file_name}"
+
+        storage.delete_s3_objects_with_prefix(
+            bucket=BUCKET, prefix=f"{S3_PREFIX_LATEST}/{subdir_or_prefix}/dag_image"
+        )
+
+        storage.save_s3_object(
+            bucket=BUCKET,
+            key=latest_key,
+            content=dag_image,
+        )
+        storage.save_s3_object(
+            bucket=BUCKET,
+            key=historical_key,
+            content=dag_image,
+        )
+
+        return f"s3://{BUCKET}/{latest_key}", f"s3://{BUCKET}/{historical_key}"
+
+    else:
+        latest_path = f"{LOCAL_DIR_LATEST}/{subdir_or_prefix}/dag_image/{dag_file_name}"
+        historical_path = f"{LOCAL_DIR_HISTORICAL}/{price_cap_period_prefix}/{subdir_or_prefix}/dag_image/{dag_file_name}"
+
+        storage.delete_files_in_directory(
+            f"{LOCAL_DIR_LATEST}/{subdir_or_prefix}/dag_image"
+        )
+
+        storage.save_local_file(
+            file_path=latest_path,
+            content=dag_image,
+        )
+        storage.save_local_file(
+            file_path=historical_path,
+            content=dag_image,
+        )
+
+        return latest_path, historical_path
