@@ -39,7 +39,9 @@ def build_bronze_driver() -> driver.Builder:
                 "file_link_text": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["file_link_text"],
                 "publisher": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["publisher"],
                 "pipeline_version": version("asf-mission-data"),
-                "bronze_ingest_timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+                "bronze_ingest_timestamp": datetime.now(timezone.utc).strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                ),
             }
         )
         .build()
@@ -55,32 +57,34 @@ def run_bronze_pipeline():
         2. Generating DAG visualisation of raw file extraction.
         3. Saving provenance metadata for raw data.
         4. Generating DAG visualisation of metadata workflow.
-
-    Notes:
-        - Only the bronze layer is executed; silver/gold transformations are not included.
-        - DAG images are saved to `docs/dag-images` with file names based on the latest raw file name.
     """
 
     dr = build_bronze_driver()
 
-    dr.execute(["saved_file_path"])
+    dr.execute(["saved_bronze_excel_file", "saved_bronze_metadata"])
 
+    # save dag images
     latest_file_name = dr.execute(["latest_file_name"])["latest_file_name"]
-
-    dag_output_dir = "docs/dag-images"
-
-    dr.visualize_execution(
-        ["saved_file_path"],
-        f"{dag_output_dir}/{latest_file_name}.dag.png",
-        render_kwargs={},
+    latest_price_cap_period = dr.execute(["latest_price_cap_period"])[
+        "latest_price_cap_period"
+    ]
+    raw_file_dag_png = dr.visualize_execution(
+        ["saved_bronze_excel_file"], None, render_kwargs={}
+    ).pipe(format="png")
+    metadata_dag_png = dr.visualize_execution(
+        ["saved_bronze_metadata"], None, render_kwargs={}
+    ).pipe(format="png")
+    bronze.saved_dag_visualisation(
+        accompanying_file_name=latest_file_name,
+        subdir_or_prefix="raw",
+        dag_image=raw_file_dag_png,
+        latest_price_cap_period=latest_price_cap_period,
     )
-
-    dr.execute(["saved_provenance_metadata_file_path"])
-
-    dr.visualize_execution(
-        ["saved_provenance_metadata_file_path"],
-        f"{dag_output_dir}/{latest_file_name}.metadata.dag.png",
-        render_kwargs={},
+    bronze.saved_dag_visualisation(
+        accompanying_file_name=latest_file_name,
+        subdir_or_prefix="metadata",
+        dag_image=metadata_dag_png,
+        latest_price_cap_period=latest_price_cap_period,
     )
 
 
