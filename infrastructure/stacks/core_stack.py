@@ -185,8 +185,6 @@ class CoreStack(Stack):
                     "iam:CreateRole",
                     "iam:DeleteRole",
                     "iam:GetRole",
-                    "iam:AttachRolePolicy",
-                    "iam:DetachRolePolicy",
                     "iam:PutRolePolicy",
                     "iam:DeleteRolePolicy",
                     "iam:GetRolePolicy",

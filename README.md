@@ -55,13 +55,48 @@ asf_mission_data/           # Python package (pipeline code)
 ├── alerting.py             # Slack alerting utilities
 └── pipeline/               # Pipeline implementations
     └── example/            # Template pipeline
-infrastructure/             # CloudFormation templates
-├── core/                   # Shared resources (S3, IAM)
-└── pipeline/               # Per-pipeline template
+infrastructure/             # CDK infrastructure
+├── app.py                  # CDK entry point
+├── cdk.json                # CDK configuration
+├── config/                 # Environment configurations
+│   ├── environments.py     # EnvironmentConfig dataclass
+│   ├── dev.py              # Dev environment values
+│   └── prod.py             # Prod environment values
+└── stacks/                 # CDK stacks
+    └── core_stack.py       # Shared resources (S3, ECR, IAM)
 tests/                      # Test suite
 docs/                       # Documentation and runbooks
 scripts/                    # Utility scripts
 ```
+
+## Infrastructure
+
+Infrastructure is managed with [AWS CDK](https://aws.amazon.com/cdk/) (Python).
+
+### Core resources (deployed)
+
+| Resource | Dev | Prod |
+|----------|-----|------|
+| S3 bucket | `asf-mission-data-dev` | `asf-mission-data-prod` |
+| ECR repository | `asf-pipelines-dev` | `asf-pipelines-prod` |
+| GitHub Actions IAM role | `asf-github-actions-dev` | `asf-github-actions-prod` |
+
+### Deploying infrastructure
+
+```bash
+# Install CDK dependencies
+uv sync --extra infrastructure
+npm install -g aws-cdk
+
+# Deploy to dev
+cd infrastructure
+cdk deploy --context env=dev
+
+# Preview changes
+cdk diff --context env=dev
+```
+
+See [infrastructure/README.md](infrastructure/README.md) for full documentation.
 
 ## Creating a new pipeline
 
