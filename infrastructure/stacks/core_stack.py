@@ -115,6 +115,15 @@ class CoreStack(Stack):
             )
         )
 
+        # ECR describe (needed for CI/CD checks)
+        self.github_actions_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="ECRDescribe",
+                actions=["ecr:DescribeRepositories"],
+                resources=[self.ecr_repo.repository_arn],
+            )
+        )
+
         # -----------------------------------------------------------------
         # S3 Permissions
         # -----------------------------------------------------------------
