@@ -41,6 +41,7 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+infrastructure/.env
 
 # Local data and pipeline output
 # When running pipelines locally with DATA_ROOT=/tmp/pipeline-dev or similar,
