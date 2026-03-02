@@ -11,6 +11,7 @@ from asf_mission_data.pipeline.energy_price_cap_levels_annex_9 import bronze
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import (
     ENERGY_PRICE_CAP_LEVELS_ANNEX_9,
 )
+from asf_mission_data import storage
 
 logging.basicConfig(
     level=logging.INFO,
@@ -35,6 +36,7 @@ def build_bronze_driver() -> driver.Builder:
         .with_modules(bronze)
         .with_config(
             {
+                "pipeline_name": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["pipeline_name"],
                 "collection_url": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["collection_url"],
                 "file_link_text": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["file_link_text"],
                 "publisher": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["publisher"],
@@ -54,37 +56,37 @@ def run_bronze_pipeline():
 
     This function performs the bronze layer workflow:
         1. Extracting and saving latest raw data file.
-        2. Generating DAG visualisation of raw file extraction.
-        3. Saving provenance metadata for raw data.
-        4. Generating DAG visualisation of metadata workflow.
+        2. Saving provenance metadata for raw data.
+        3. Generating and saving DAG visualisation of raw file extraction.
     """
 
     dr = build_bronze_driver()
 
-    dr.execute(["saved_bronze_excel_file", "saved_bronze_metadata"])
-
-    # save dag images
-    latest_file_name = dr.execute(["latest_file_name"])["latest_file_name"]
-    latest_price_cap_period = dr.execute(["latest_price_cap_period"])[
-        "latest_price_cap_period"
+    node_targets = [
+        "bronze_energy_price_cap_annex_9_file",
+        "latest_file_name",
+        "latest_price_cap_period",
     ]
-    raw_file_dag_png = dr.visualize_execution(
-        ["saved_bronze_excel_file"], None, render_kwargs={}
+
+    results = dr.execute(node_targets)
+
+    # generate dag image
+    dag_png = dr.visualize_execution(
+        ["bronze_energy_price_cap_annex_9_file"],
+        None,
+        render_kwargs={},
     ).pipe(format="png")
-    metadata_dag_png = dr.visualize_execution(
-        ["saved_bronze_metadata"], None, render_kwargs={}
-    ).pipe(format="png")
-    bronze.saved_dag_visualisation(
+
+    # extract parameters for dag file name
+    latest_file_name = results["latest_file_name"]
+    price_cap_period_prefix = results["latest_price_cap_period"].replace(" ", "_")
+
+    # save dag image
+    storage.save_bronze_dag(
+        pipeline_name=ENERGY_PRICE_CAP_LEVELS_ANNEX_9["pipeline_name"],
         accompanying_file_name=latest_file_name,
-        subdir_or_prefix="raw",
-        dag_image=raw_file_dag_png,
-        latest_price_cap_period=latest_price_cap_period,
-    )
-    bronze.saved_dag_visualisation(
-        accompanying_file_name=latest_file_name,
-        subdir_or_prefix="metadata",
-        dag_image=metadata_dag_png,
-        latest_price_cap_period=latest_price_cap_period,
+        dag_image=dag_png,
+        date_stamp=price_cap_period_prefix,
     )
 
 

@@ -1,4 +1,3 @@
-import json
 import re
 from pathlib import Path
 from urllib.parse import urljoin
@@ -6,23 +5,6 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 from asf_mission_data import storage, utils
-
-# Path parameters
-BASE_PATH = storage.get_data_path("energy_price_cap_levels_annex_9/bronze")
-is_s3 = utils.is_s3_uri(BASE_PATH)
-if is_s3:
-    BUCKET, BASE_PREFIX = utils.parse_s3_uri(BASE_PATH)
-    S3_PREFIX_LATEST = f"{BASE_PREFIX}/latest"
-    S3_PREFIX_HISTORICAL = f"{BASE_PREFIX}/historical"
-else:
-    LOCAL_DIR_LATEST = f"{BASE_PATH}/latest"
-    LOCAL_DIR_HISTORICAL = f"{BASE_PATH}/historical"
-
-
-# Regex pattern for expected price cap period dates format
-PRICE_CAP_PERIOD_PATTERN = re.compile(
-    r"\d{1,2}\s+[A-Za-z]+\s+to\s+\d{1,2}\s+[A-Za-z]+\s+\d{4}"
-)
 
 
 def latest_collection_page_html_soup(collection_url: str) -> BeautifulSoup:
@@ -83,8 +65,13 @@ def latest_price_cap_period(latest_collection_page_html_soup: BeautifulSoup) -> 
         str: Latest price cap period (e.g., "1 January to 31 March 2026").
     """
 
+    # Regex pattern for expected price cap period dates format
+    price_cap_period_pattern = re.compile(
+        r"\d{1,2}\s+[A-Za-z]+\s+to\s+\d{1,2}\s+[A-Za-z]+\s+\d{4}"
+    )
+
     for heading in latest_collection_page_html_soup.find_all(["h2", "h3"]):
-        match = PRICE_CAP_PERIOD_PATTERN.search(heading.get_text(strip=True))
+        match = price_cap_period_pattern.search(heading.get_text(strip=True))
         if match:
             return match.group(0)
 
@@ -162,195 +149,49 @@ def bronze_metadata(
     }
 
 
-def saved_bronze_excel_file(
+def bronze_energy_price_cap_annex_9_file(
+    pipeline_name: str,
     latest_file_content: bytes,
     latest_file_name: str,
     latest_price_cap_period: str,
-) -> tuple[str, str]:
-    """Save the latest Excel file to both "latest" and "historical" storage locations.
+    bronze_metadata: dict,
+) -> None:
+    """Ingest the latest energy price cap Annex 9 dataset into the bronze layer.
 
-    Depending on storage configuration (`is_s3`), the function either:
-    - S3 storage: Uploads file to S3 bucket under a "latest" key (replacing any existing objects)
-        and a "historical" key organised by price cap period.
-    - Local storage: writes file to local directories under a "latest" subdirectory (replacing any existing files)
-        and a "historical" subdirectory organised by price cap period.
+    This node persists the extracted raw dataset and its associated provenance
+    metadata into the bronze storage layer.
 
-    Args:
-        latest_file_content (bytes): Content of Excel file in bytes.
-        latest_file_name (str): Name of file, including extension.
-        latest_price_cap_period (str): Price cap period string, extracted directly from Ofgem collection page.
+    Performs the following actions:
+        1. Persists bronze file and metadata to 'historical' price cap period partition.
+        2. Deletes any existing 'latest' bronze files and metadata.
+        3. Stores bronze file and metadata under:
+            - historical/<price_cap_period>/
+            - latest
 
-    Returns:
-        tuple[str, str]: Tuple containing the paths or S3 URIs of the saved files to "latest" and to "historical".
-    """
-    price_cap_period_prefix = latest_price_cap_period.replace(" ", "_")
-    if is_s3:
-        latest_key = f"{S3_PREFIX_LATEST}/raw/{latest_file_name}"
-        historical_key = (
-            f"{S3_PREFIX_HISTORICAL}/{price_cap_period_prefix}/raw/{latest_file_name}"
-        )
+    Storage structure:
 
-        storage.delete_s3_objects_with_prefix(
-            bucket=BUCKET, prefix=f"{S3_PREFIX_LATEST}/raw"
-        )
-        storage.save_s3_object(
-            bucket=BUCKET,
-            key=latest_key,
-            content=latest_file_content,
-        )
-        storage.save_s3_object(
-            bucket=BUCKET,
-            key=historical_key,
-            content=latest_file_content,
-        )
-        return f"s3://{BUCKET}/{latest_key}", f"s3://{BUCKET}/{historical_key}"
-    else:
-        latest_path = f"{LOCAL_DIR_LATEST}/raw/{latest_file_name}"
-        historical_path = (
-            f"{LOCAL_DIR_HISTORICAL}/{price_cap_period_prefix}/raw/{latest_file_name}"
-        )
-
-        storage.delete_files_in_directory(f"{LOCAL_DIR_LATEST}/raw")
-        storage.save_local_file(
-            file_path=latest_path,
-            content=latest_file_content,
-        )
-        storage.save_local_file(
-            file_path=historical_path,
-            content=latest_file_content,
-        )
-        return latest_path, historical_path
-
-
-def saved_bronze_metadata(
-    latest_file_name: str,
-    bronze_metadata: dict[str, str],
-    latest_price_cap_period: str,
-) -> tuple[str, str]:
-    """Save the provenance metadata for the latest Excel file to both "latest" and "historical" storage locations.
-
-    Depending on storage configuration (`is_s3`), the function either:
-    - S3 storage: Uploads file to S3 bucket under a "latest" key (replacing any existing objects)
-        and a "historical" key organised by price cap period.
-    - Local storage: writes file to local directories under a "latest" subdirectory (replacing any existing files)
-        and a "historical" subdirectory organised by price cap period.
+        <data_root>/<pipeline_name>/bronze/
+                ├── historical/<price_cap_period>/file/
+                ├── historical/<price_cap_period>/metadata/
+                └── latest/
+                    ├── file/
+                    └── metadata/
 
     Args:
-        latest_file_name (str): Name of latest Excel file, including extension.
-        bronze_metadata (dict[str, str]): Dictionary of metadata about latest Excel file.
-        latest_price_cap_period (str): Price cap period string, extracted directly from Ofgem collection page.
-
-    Returns:
-        tuple[str, str]: Tuple containing the paths or S3 URIs of the saved metadata files to "latest" and to "historical".
+        pipeline_name (str): Name of pipeline used to namespace bronze storage.
+        latest_file_content (bytes): Latest dataset file to persist.
+        latest_file_name (str): Latest file name to persist.
+        latest_price_cap_period (str): The latest price cap period covered by
+            the latest data file.
+        bronze_metadata (dict): Associated provenance metadata.
     """
-
-    metadata_file_name = f"{latest_file_name}.metadata.json"
-    metadata_json = json.dumps(bronze_metadata, indent=4)
 
     price_cap_period_prefix = latest_price_cap_period.replace(" ", "_")
 
-    if is_s3:
-        latest_key = f"{S3_PREFIX_LATEST}/metadata/{metadata_file_name}"
-        historical_key = f"{S3_PREFIX_HISTORICAL}/{price_cap_period_prefix}/metadata/{metadata_file_name}"
-
-        storage.delete_s3_objects_with_prefix(
-            bucket=BUCKET, prefix=f"{S3_PREFIX_LATEST}/metadata"
-        )
-        storage.save_s3_object(
-            bucket=BUCKET,
-            key=latest_key,
-            content=metadata_json,
-        )
-        storage.save_s3_object(
-            bucket=BUCKET,
-            key=historical_key,
-            content=metadata_json,
-        )
-
-        return f"s3://{BUCKET}/{latest_key}", f"s3://{BUCKET}/{historical_key}"
-
-    else:
-        latest_path = f"{LOCAL_DIR_LATEST}/metadata/{metadata_file_name}"
-        historical_path = f"{LOCAL_DIR_HISTORICAL}/{price_cap_period_prefix}/metadata/{metadata_file_name}"
-
-        storage.delete_files_in_directory(f"{LOCAL_DIR_LATEST}/metadata")
-
-        storage.save_local_file(
-            file_path=latest_path,
-            content=metadata_json,
-        )
-        storage.save_local_file(
-            file_path=historical_path,
-            content=metadata_json,
-        )
-        return latest_path, historical_path
-
-
-def saved_dag_visualisation(
-    accompanying_file_name: str,
-    subdir_or_prefix: str,
-    dag_image: bytes,
-    latest_price_cap_period: str,
-) -> tuple[str, str]:
-    """Save DAG visualisation image representing the workflow that produces a specific file.
-
-    The `accompanying_file_name` identifies the file that the DAG describes.
-
-    Depending on storage configuration (`is_s3`), the function either:
-    - S3 storage: Uploads image to S3 bucket under a "latest" key (replacing any existing objects)
-        and a "historical" key organised by price cap period.
-    - Local storage: writes image to local directories under a "latest" subdirectory (replacing any existing files)
-        and a "historical" subdirectory organised by price cap period.
-
-    Args:
-        accompanying_file_name (str): Name of the file that the DAG visualises.
-        subdir_or_prefix (str): Subdirectory (local)o key prefix (S3) under which the DAG
-            image should be saved. Typically the subdirectory/prefix where the accompanying file is located.
-        dag_image (bytes): DAG visualisation image.
-        latest_price_cap_period (str): Price cap period string, extracted directly from Ofgem collection page.
-
-    Returns:
-        tuple[str, str]: Tuple containing the paths or S3 URIs of the saved DAG images to "latest" and to "historical".
-    """
-    dag_file_name = f"{accompanying_file_name}.dag.png"
-    price_cap_period_prefix = latest_price_cap_period.replace(" ", "_")
-
-    if is_s3:
-        latest_key = f"{S3_PREFIX_LATEST}/{subdir_or_prefix}/dag_image/{dag_file_name}"
-        historical_key = f"{S3_PREFIX_HISTORICAL}/{price_cap_period_prefix}/{subdir_or_prefix}/dag_image/{dag_file_name}"
-
-        storage.delete_s3_objects_with_prefix(
-            bucket=BUCKET, prefix=f"{S3_PREFIX_LATEST}/{subdir_or_prefix}/dag_image"
-        )
-
-        storage.save_s3_object(
-            bucket=BUCKET,
-            key=latest_key,
-            content=dag_image,
-        )
-        storage.save_s3_object(
-            bucket=BUCKET,
-            key=historical_key,
-            content=dag_image,
-        )
-
-        return f"s3://{BUCKET}/{latest_key}", f"s3://{BUCKET}/{historical_key}"
-
-    else:
-        latest_path = f"{LOCAL_DIR_LATEST}/{subdir_or_prefix}/dag_image/{dag_file_name}"
-        historical_path = f"{LOCAL_DIR_HISTORICAL}/{price_cap_period_prefix}/{subdir_or_prefix}/dag_image/{dag_file_name}"
-
-        storage.delete_files_in_directory(
-            f"{LOCAL_DIR_LATEST}/{subdir_or_prefix}/dag_image"
-        )
-
-        storage.save_local_file(
-            file_path=latest_path,
-            content=dag_image,
-        )
-        storage.save_local_file(
-            file_path=historical_path,
-            content=dag_image,
-        )
-
-        return latest_path, historical_path
+    storage.ingest_to_bronze(
+        pipeline_name=pipeline_name,
+        file=latest_file_content,
+        file_name=latest_file_name,
+        date_stamp=price_cap_period_prefix,
+        metadata=bronze_metadata,
+    )
