@@ -5,6 +5,9 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 from asf_mission_data import storage, utils
+from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import (
+    PRICE_CAP_PERIOD_STRING_PATTERN,
+)
 
 
 def latest_collection_page_html_soup(collection_url: str) -> BeautifulSoup:
@@ -65,13 +68,11 @@ def latest_price_cap_period(latest_collection_page_html_soup: BeautifulSoup) -> 
         str: Latest price cap period (e.g., "1 January to 31 March 2026").
     """
 
-    # Regex pattern for expected price cap period dates format
-    price_cap_period_pattern = re.compile(
-        r"\d{1,2}\s+[A-Za-z]+\s+to\s+\d{1,2}\s+[A-Za-z]+\s+\d{4}"
-    )
-
+    # Search for price cap period string header based on expected regex pattern
     for heading in latest_collection_page_html_soup.find_all(["h2", "h3"]):
-        match = price_cap_period_pattern.search(heading.get_text(strip=True))
+        match = re.compile(PRICE_CAP_PERIOD_STRING_PATTERN).search(
+            heading.get_text(strip=True)
+        )
         if match:
             return match.group(0)
 
