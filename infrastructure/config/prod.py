@@ -17,4 +17,6 @@ PROD_CONFIG = EnvironmentConfig(
         "Team": "asf",
         "ManagedBy": "cdk",
     },
+    # ECR Max Num Images
+    ecr_max_image_count=10,
 )

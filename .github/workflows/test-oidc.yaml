@@ -1,0 +1,31 @@
+name: Test OIDC
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: environment
+        required: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: ${{ inputs.environment }}
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/asf-github-actions-${{ vars.ENV_NAME }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: GitHubActions-OIDCTest-${{ github.run_id }}
+
+      - name: Verify access
+        run: |
+          echo "Environment: ${{ vars.ENV_NAME }}"
+          aws sts get-caller-identity --output table
+          aws s3 ls s3://${{ secrets.MISSION_DATA_BUCKET }}/
+          aws ecr describe-repositories --repository-names asf-pipelines-${{ vars.ENV_NAME }}

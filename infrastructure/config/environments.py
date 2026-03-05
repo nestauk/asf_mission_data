@@ -12,7 +12,7 @@ class EnvironmentConfig:
     """Configuration for a specific environment (dev/prod)"""
 
     # Environment identifier
-    environment: str  # "dev" or "prod"
+    environment: str  # "dev" or "prod" ("test" for integration tests)
 
     # AWS
     aws_account_id: str
@@ -27,6 +27,8 @@ class EnvironmentConfig:
 
     # Tagging (applied to all resources)
     tags: dict = field(default_factory=dict)
+
+    ecr_max_image_count: int = 10  # Max number of images to keep in ECR repositories
 
     # =================================================================
     # Derived properties
@@ -51,11 +53,3 @@ class EnvironmentConfig:
     def github_oidc_subject(self) -> str:
         """OIDC subject claim pattern for GitHub Actions"""
         return f"repo:{self.github_org}/{self.github_repo}:*"
-
-    def resource_name(self, name: str) -> str:
-        """Generate a consistent resource name based on project prefix and environment"""
-        return f"{self.project_prefix}-{name}-{self.environment}"
-
-    def stack_resource_arn(self, service: str, resource_type: str) -> str:
-        """Generate ARN pattern for resources in this project"""
-        return f"arn:aws:{service}:{self.aws_region}:{self.aws_account_id}:{resource_type}/{self.project_prefix}-*"  # noqa: E501

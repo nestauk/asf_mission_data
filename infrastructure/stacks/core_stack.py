@@ -16,8 +16,9 @@ from aws_cdk import CfnOutput, RemovalPolicy, Stack
 from aws_cdk import aws_ecr as ecr
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_s3 as s3
-from config.environments import EnvironmentConfig
 from constructs import Construct
+
+from infrastructure.config.environments import EnvironmentConfig
 
 
 class CoreStack(Stack):
@@ -34,13 +35,16 @@ class CoreStack(Stack):
 
         self.config = config
 
-        # =================================================================
-        # S3 Bucket
-        # =================================================================
+        # This allows us to set what should happen to the resource
+        # if the stack is deleted
         # RETAIN in prod (protect data), DESTROY in dev (clean teardown)
         removal_policy = (
             RemovalPolicy.RETAIN if config.environment == "prod" else RemovalPolicy.DESTROY
         )
+
+        # =================================================================
+        # S3 Bucket
+        # =================================================================
 
         self.data_bucket = s3.Bucket(
             self,
@@ -65,8 +69,8 @@ class CoreStack(Stack):
             image_scan_on_push=True,
             lifecycle_rules=[
                 ecr.LifecycleRule(
-                    description="Keep last 10 images",
-                    max_image_count=10,
+                    description=f"Keep last {config.ecr_max_image_count} images",
+                    max_image_count=config.ecr_max_image_count,
                 )
             ],
             removal_policy=removal_policy,
@@ -136,13 +140,15 @@ class CoreStack(Stack):
             iam.PolicyStatement(
                 sid="CloudFormation",
                 actions=[
-                    "cloudformation:CreateStack",
-                    "cloudformation:UpdateStack",
-                    "cloudformation:DeleteStack",
-                    "cloudformation:DescribeStacks",
-                    "cloudformation:DescribeStackEvents",
-                    "cloudformation:GetTemplate",
+                    "cloudformation:Create*",
+                    "cloudformation:Describe*",
+                    "cloudformation:Cancel*",
+                    "cloudformation:List*",
+                    "cloudformation:Get*",
+                    "cloudformation:Update*",
+                    "cloudformation:Delete*",
                     "cloudformation:ValidateTemplate",
+                    "cloudformation:ExecuteChangeSet",
                 ],
                 resources=[
                     f"arn:aws:cloudformation:{config.aws_region}:{config.aws_account_id}:stack/{config.project_prefix}-*/*"
@@ -190,6 +196,8 @@ class CoreStack(Stack):
                     "iam:GetRolePolicy",
                     "iam:TagRole",
                     "iam:UntagRole",
+                    "iam:AttachRolePolicy",
+                    "iam:DetachRolePolicy",
                 ],
                 resources=[f"arn:aws:iam::{config.aws_account_id}:role/{config.project_prefix}-*"],
             )
