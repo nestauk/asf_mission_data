@@ -81,7 +81,7 @@ def convert_energy_price_cap_period_string_to_interval(period_str: str) -> pd.In
         end_dt = (
             pd.to_datetime(f"{parts['end_day']} {parts['end_month']} {parts['year']}")
             + pd.Timedelta(days=1)
-            - pd.Timedelta(microseconds=1)
+            - pd.Timedelta(seconds=1)
         )
 
         return pd.Interval(start_dt, end_dt, closed="both")

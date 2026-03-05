@@ -5,8 +5,6 @@ import logging
 import json
 import fsspec
 
-from asf_mission_data import storage, utils
-
 logger = logging.getLogger(__name__)
 
 
