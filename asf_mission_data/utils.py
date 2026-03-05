@@ -73,16 +73,9 @@ def convert_energy_price_cap_period_string_to_interval(period_str: str) -> pd.In
 
     match = re.match(PRICE_CAP_PERIOD_INTERVAL_PATTERN, period_str)
     if match:
-
         parts = match.groupdict()
-        start_dt = pd.to_datetime(
-            f"{parts['start_day']} {parts['start_month']} {parts['year']}"
-        )
-        end_dt = (
-            pd.to_datetime(f"{parts['end_day']} {parts['end_month']} {parts['year']}")
-            + pd.Timedelta(days=1)
-            - pd.Timedelta(seconds=1)
-        )
+        start_dt = pd.to_datetime(f"{parts['start_day']} {parts['start_month']} {parts['year']}")
+        end_dt = pd.to_datetime(f"{parts['end_day']} {parts['end_month']} {parts['year']}") + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
 
         return pd.Interval(start_dt, end_dt, closed="both")
     else:
@@ -90,6 +83,4 @@ def convert_energy_price_cap_period_string_to_interval(period_str: str) -> pd.In
             "Price cap period string '%s' does not match expected regex pattern",
             period_str,
         )
-        raise ValueError(
-            "Price cap period string format does not match expected regex pattern."
-        )
+        raise ValueError("Price cap period string format does not match expected regex pattern.")

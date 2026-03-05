@@ -190,9 +190,7 @@ def ingest_to_bronze(
 
     base_path = f"{data_root}/{pipeline_name}/bronze"
     historical_file = f"{base_path}/historical/{date_stamp}/file/{file_name}"
-    historical_metadata = (
-        f"{base_path}/historical/{date_stamp}/metadata/{file_name}.metadata.json"
-    )
+    historical_metadata = f"{base_path}/historical/{date_stamp}/metadata/{file_name}.metadata.json"
     latest_file = f"{base_path}/latest/file/{file_name}"
     latest_metadata = f"{base_path}/latest/metadata/{file_name}.metadata.json"
 

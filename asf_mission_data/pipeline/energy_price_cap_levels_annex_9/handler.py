@@ -44,9 +44,7 @@ def build_bronze_driver() -> driver.Builder:
                 "file_link_text": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["file_link_text"],
                 "publisher": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["publisher"],
                 "pipeline_version": version("asf-mission-data"),
-                "bronze_ingest_timestamp": datetime.now(timezone.utc).strftime(
-                    "%Y-%m-%d %H:%M:%S"
-                ),
+                "bronze_ingest_timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
             }
         )
         .build()

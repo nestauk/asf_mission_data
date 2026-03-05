@@ -17,10 +17,10 @@ ENERGY_PRICE_CAP_LEVELS_ANNEX_9 = {
 }
 
 # Regex pattern for expected price cap period dates string format on Ofgem website
-PRICE_CAP_PERIOD_STRING_PATTERN = (
-    r"(\d{1,2}\s+[A-Za-z]+\s+to\s+\d{1,2}\s+[A-Za-z]+\s+\d{4})"
+PRICE_CAP_PERIOD_STRING_PATTERN = r"(\d{1,2}\s+[A-Za-z]+\s+to\s+\d{1,2}\s+[A-Za-z]+\s+\d{4})"
+PRICE_CAP_PERIOD_INTERVAL_PATTERN = (
+    r"(?P<start_day>\d{1,2})\s+(?P<start_month>[A-Za-z]+)\s+to\s+(?P<end_day>\d{1,2})\s+(?P<end_month>[A-Za-z]+)\s+(?P<year>\d{4})"
 )
-PRICE_CAP_PERIOD_INTERVAL_PATTERN = r"(?P<start_day>\d{1,2})\s+(?P<start_month>[A-Za-z]+)\s+to\s+(?P<end_day>\d{1,2})\s+(?P<end_month>[A-Za-z]+)\s+(?P<year>\d{4})"
 
 PRICE_CAP_PERIOD_PUBLICATION_DATES = {
     "1 January to 31 March 2026": "2025-11-21",

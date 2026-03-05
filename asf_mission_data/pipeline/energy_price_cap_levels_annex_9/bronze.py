@@ -83,10 +83,7 @@ class LatestPriceCapFileUrlValidator(DataValidator):
             )
 
         # Get expected publication dates is same format as file url date
-        PUBLICATION_DATES = (
-            datetime.fromisoformat(v)
-            for v in self.price_cap_period_publication_dates.values()
-        )
+        PUBLICATION_DATES = (datetime.fromisoformat(v) for v in self.price_cap_period_publication_dates.values())
 
         # Get expected price cap period
         now = datetime.now()
@@ -171,13 +168,9 @@ class LatestPriceCapValidator(DataValidator):
         :param data: data to validate
         :return: The result of validation
         """
-        extracted_period_interval = (
-            utils.convert_energy_price_cap_period_string_to_interval(data)
-        )
+        extracted_period_interval = utils.convert_energy_price_cap_period_string_to_interval(data)
         INTERVAL_PUBLICATION_DATES = {
-            utils.convert_energy_price_cap_period_string_to_interval(
-                k
-            ): datetime.fromisoformat(v)
+            utils.convert_energy_price_cap_period_string_to_interval(k): datetime.fromisoformat(v)
             for k, v in self.price_cap_period_publication_dates.items()
         }
 
@@ -202,7 +195,7 @@ class LatestPriceCapValidator(DataValidator):
 
         return ValidationResult(
             passes=valid,
-            message=f"Expected publication date: {latest_publication_date.strftime(format="%d-%m-%Y")}, saw publication date {publication_date.strftime(format="%d-%m-%Y")}",
+            message=f"Expected publication date: {latest_publication_date.strftime(format='%d-%m-%Y')}, saw publication date {publication_date.strftime(format='%d-%m-%Y')}",
         )
 
 
@@ -226,9 +219,7 @@ def latest_price_cap_period(latest_collection_page_html_soup: BeautifulSoup) -> 
 
     # Search for price cap period string header based on expected regex pattern
     for heading in latest_collection_page_html_soup.find_all(["h2", "h3"]):
-        match = re.compile(PRICE_CAP_PERIOD_STRING_PATTERN).search(
-            heading.get_text(strip=True)
-        )
+        match = re.compile(PRICE_CAP_PERIOD_STRING_PATTERN).search(heading.get_text(strip=True))
         if match:
             return match.group(0)
 
