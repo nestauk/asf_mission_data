@@ -1,8 +1,9 @@
 """Storage path utilities for local and S3 data access."""
 
-import os
-import logging
 import json
+import logging
+import os
+
 import fsspec
 
 logger = logging.getLogger(__name__)
@@ -135,13 +136,13 @@ def delete_prefix(uri_prefix: str) -> None:
     fs, path = fsspec.core.url_to_fs(uri_prefix)
 
     if not fs.exists(path):
-        logger.info("Prefix does not exist: %s", uri_prefix)
+        logger.warning("Prefix does not exist: %s", uri_prefix)
         return
 
     targets = fs.glob(path + "*")
 
     if not targets:
-        logger.info("No files found under prefix: %s", uri_prefix)
+        logger.warning("No files found under prefix: %s", uri_prefix)
         return
 
     fs.rm(path, recursive=True)
@@ -190,7 +191,9 @@ def ingest_to_bronze(
 
     base_path = f"{data_root}/{pipeline_name}/bronze"
     historical_file = f"{base_path}/historical/{date_stamp}/file/{file_name}"
-    historical_metadata = f"{base_path}/historical/{date_stamp}/metadata/{file_name}.metadata.json"
+    historical_metadata = (
+        f"{base_path}/historical/{date_stamp}/metadata/{file_name}.metadata.json"
+    )
     latest_file = f"{base_path}/latest/file/{file_name}"
     latest_metadata = f"{base_path}/latest/metadata/{file_name}.metadata.json"
 
