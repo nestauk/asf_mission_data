@@ -56,7 +56,7 @@ This project uses **pre-commit hooks** and **ruff** to automatically format and 
 #### VS Code setup (recommended)
 
 1. **Install the Ruff extension** - Search for "Ruff" in VS Code extensions and install the official Astral extension
-2. **Add to `.vscode/settings.json`** (Select the "Preferences: Open Workspace Settings (JSON)" command in the Command Palette (Mac: ⇧⌘P Win: Ctrl + shift + P)):
+2. **Add to `.vscode/settings.json`** (You may need to first select the "Preferences: Open Workspace Settings (JSON)" command in the Command Palette (Mac: ⇧⌘P Win: Ctrl + shift + P)):
 
 ```json
 {
@@ -94,6 +94,12 @@ uv run pre-commit install
 
 # This will run on every git commit and auto-fix what it can
 # If it makes changes, stage them and commit again
+
+# Test hooks without committing
+uv run pre-commit run --all-files
+
+# Commit without running hooks
+git commit --no-verify
 ```
 
 ## Project structure
