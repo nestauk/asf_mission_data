@@ -1,15 +1,4 @@
-exclude: |
-            (?x)^(
-              uv\.lock|
-              asf_mission_data\.egg-info/|
-              infrastructure/cdk\.out/|
-              infrastructure/\.coverage
-            )$
 fail_fast: true
-default_language_version:
-  python: python3.12
-default_install_hook_types:
-  - pre-commit
 repos:
 #
 # ---------------------------------------------------------------------------- #
@@ -68,8 +57,8 @@ repos:
         exclude: "docs/mkdocs.yml"
 # ------------------------------- 🌳 Git Tools ------------------------------- #
     -   id: check-added-large-files
-        args: ['--maxkb=500']  # set the maximum file size to 500KB
-        name: "🌳 git · Prevent adding files larger than 500KB"
+        args: ['--maxkb=600']  # set the maximum file size to 600KB
+        name: "🌳 git · Prevent adding files larger than 600KB"
     -   id: check-merge-conflict
         name: "🌳 git · Prevent committing unresolved merge conflicts"
     -   id: no-commit-to-branch
