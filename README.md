@@ -96,6 +96,8 @@ uv run pre-commit install
 # If it makes changes, stage them and commit again
 
 # Test hooks without committing
+uv run pre-commit run
+# or
 uv run pre-commit run --all-files
 
 # Commit without running hooks
