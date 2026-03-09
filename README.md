@@ -64,13 +64,13 @@ This project uses **pre-commit hooks** and **ruff** to automatically format and 
     "editor.defaultFormatter": "charliermarsh.ruff",
     "editor.formatOnSave": true,
     "editor.codeActionsOnSave": {
-      "source.fixAll": "explicit"
+      "source.fixAll.ruff": "explicit"
     }
   }
 }
 ```
 
-This auto-formats your code every time you save, so ruff issues are fixed before you commit.
+This auto-formats your Python files every time you save, so ruff issues are fixed before you commit.
 
 #### Command line
 
