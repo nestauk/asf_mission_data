@@ -1,4 +1,3 @@
-fail_fast: true
 repos:
 #
 # ---------------------------------------------------------------------------- #
@@ -24,10 +23,11 @@ repos:
 -   repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.5
     hooks:
+    -   id: ruff-check
+        args: [--fix]
+        name: "🐍 python · Lint and fix with Ruff"
     -   id: ruff-format
         name: "🐍 python · Format with Ruff"
-    -   id: ruff-check
-        name: "🐍 python · Check with Ruff"
 
 -   repo: https://github.com/abravalheri/validate-pyproject
     rev: v0.25
