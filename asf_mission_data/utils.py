@@ -3,6 +3,7 @@ import re
 
 import pandas as pd
 import requests
+from pandas.tseries.offsets import MonthEnd
 
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import (
     PRICE_CAP_PERIOD_INTERVAL_PATTERN,
@@ -84,3 +85,46 @@ def convert_energy_price_cap_period_string_to_interval(period_str: str) -> pd.In
             period_str,
         )
         raise ValueError("Price cap period string format does not match expected regex pattern.")
+
+
+def convert_energy_price_cap_charge_restriction_period_string_to_interval(
+    period_str: str,
+) -> pd.Interval:
+    """Convert a charge restriction period string into a pandas Interval.
+
+    Parses strings describing energy price cap charge restriction periods, e.g.:
+        "April 2026 - June 2026" or "April 2026 to June 2026"
+
+    The resulting interval is inclusive of the full months, with:
+        - start date: first day of the start month
+        - end date: last second of the last day of the end month
+
+    Args:
+        period_str (str): Charge restriction period string to convert.
+
+    Returns:
+        pd.Interval: Interval covering the full charge restriction period, closed on both ends.
+    """
+
+    charge_restriction_period_interval_pattern = (
+        r"(?P<start_month>[A-Za-z]+)\s+(?P<start_year>\d{4})\s*"
+        r"(?:-|to)\s*"
+        r"(?P<end_month>[A-Za-z]+)\s+(?P<end_year>\d{4})"
+    )
+
+    match = re.search(charge_restriction_period_interval_pattern, period_str.strip(), re.IGNORECASE)
+
+    if match:
+        parts = match.groupdict()
+        start_dt = pd.to_datetime(f"{parts['start_month']} {parts['start_year']}")
+        end_base_dt = pd.to_datetime(f"{parts['end_month']} {parts['end_year']}")
+        end_final_dt = end_base_dt + MonthEnd(0) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+
+        return pd.Interval(left=start_dt, right=end_final_dt, closed="both")
+
+    else:
+        logger.error(
+            "Charge restriction period string '%s' does not match expected regex pattern.",
+            period_str,
+        )
+        raise ValueError("Charge restriction period string '%s' does not match expected regex pattern.")

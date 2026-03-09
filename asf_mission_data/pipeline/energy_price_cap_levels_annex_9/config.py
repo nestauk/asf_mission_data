@@ -14,6 +14,7 @@ ENERGY_PRICE_CAP_LEVELS_ANNEX_9 = {
     "publisher": "Ofgem",
     "collection_url": "https://www.ofgem.gov.uk/energy-regulation/domestic-and-non-domestic/energy-pricing-rules/energy-price-cap/energy-price-cap-default-tariff-levels",
     "file_link_text": "Final levelised cap rates model (Annex 9)",
+    "silver_datasets": {"tariff_tables": "1c Consumption adjusted levels"},  # name of silver data table <-> Excel sheet tab name
 }
 
 # Regex pattern for expected price cap period dates string format on Ofgem website

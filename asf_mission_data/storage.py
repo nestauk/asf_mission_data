@@ -5,6 +5,7 @@ import logging
 import os
 
 import fsspec
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -243,4 +244,174 @@ def save_bronze_dag(
 
     persist(historical_file, dag_image)
     delete_prefix(f"{base_path}/latest/dag_image/")
+    persist(latest_file, dag_image)
+
+
+def locate_latest_bronze(pipeline_name: str, file_or_metadata: str = "file") -> str:
+    """Locate the latest bronze dataset file or metadata for a given pipeline.
+
+    Args:
+        pipeline_name (str): Name of the pipeline.
+        file_or_metadata (str, optional): Either 'file' or 'metadata'.
+            Defaults to "file".
+
+    Raises:
+        ValueError: If `file_or_metadata` is not 'file' or 'metadata'.
+
+    Returns:
+        str: URI of the latest bronze file or metadata, or None if not found.
+    """
+
+    if file_or_metadata not in ["file", "metadata"]:
+        raise ValueError(f"Invalid file type {file_or_metadata} to be located, must be 'file' or 'metadata'.")
+
+    _, data_root = _initialise_environment()
+
+    uri_prefix = f"{data_root}/{pipeline_name}/bronze/latest/{file_or_metadata}"
+
+    fs, path = fsspec.core.url_to_fs(uri_prefix)
+
+    if not fs.exists(path):
+        logger.info("Prefix does not exist: %s", uri_prefix)
+        return
+
+    files = fs.glob(path + "/*")
+
+    files = [f for f in files if fs.isfile(f)]
+
+    if not files:
+        logger.info("No files found under prefix: %s", uri_prefix)
+        return
+
+    logger.info(
+        "Found %d item(s) under prefix: %s",
+        len(files),
+        uri_prefix,
+    )
+
+    return fs.unstrip_protocol(files[0])
+
+
+def read_excel_sheet(excel_uri: str, sheet_name: str) -> pd.DataFrame:
+    """Read a specific sheet from an Excel file into a pandas DataFrame.
+
+    Args:
+        excel_uri (str): URI or path to the Excel file.
+        sheet_name (str): Name of the sheet to read.
+
+    Returns:
+        pd.DataFrame: DataFrame containing the sheet data.
+    """
+    try:
+        df = pd.read_excel(excel_uri, sheet_name, engine="openpyxl")
+        logger.info(f"Successfully loaded '{sheet_name}' from {excel_uri} as a dataframe.")
+        return df
+    except Exception as e:
+        logger.error(f"Failed to load tab '{sheet_name}' from Excel file '{excel_uri}' as dataframe: {e}")
+        raise e
+
+
+def read_json(json_uri: str) -> any:
+    """Read a JSON file from local or remote storage.
+
+    Args:
+        json_uri (str): URI or path to the JSON file.
+
+    Returns:
+        any: Parsed JSON content.
+    """
+
+    try:
+        with fsspec.open(json_uri, mode="r") as f:
+            data = json.load(f)
+
+        logger.info("Successfully loaded JSON from %s", json_uri)
+        return data
+
+    except FileNotFoundError:
+        logger.error("JSON file not found: %s", json_uri)
+        raise
+
+    except Exception:
+        logger.exception("Unexpected error while reading JSON: %s", json_uri)
+        raise
+
+
+def persist_df_parquet(uri: str, df: pd.DataFrame) -> None:
+    """Persist a pandas DataFrame as a Parquet file.
+
+    Args:
+        uri (str): Destination URI or path.
+        df (pd.DataFrame): DataFrame to save.
+    """
+    fs, path = fsspec.core.url_to_fs(uri)
+
+    parent = os.path.dirname(path)
+    if parent:
+        fs.mkdirs(parent, exist_ok=True)
+
+    with fs.open(path, "wb") as f:
+        df.to_parquet(f, engine="pyarrow", index=False)
+
+    logger.info("Saved parquet: %s", uri)
+
+
+def ingest_to_silver(
+    pipeline_name: str,
+    df: pd.DataFrame,
+    df_name: str,
+    date_stamp: str,
+) -> None:
+    """Save a DataFrame to the silver storage layer.
+
+    Behaviour:
+        - Stores a historical version with timestamp.
+        - Updates the 'latest' version by replacing previous files.
+
+    Args:
+        pipeline_name (str): Pipeline name used for namespacing.
+        df (pd.DataFrame): DataFrame to persist.
+        df_name (str): Name of the DataFrame (used in storage paths).
+        date_stamp (str): Canonical timestamp for historical storage.
+    """
+
+    _, data_root = _initialise_environment()
+
+    base_path = f"{data_root}/{pipeline_name}/silver"
+    historical_file = f"{base_path}/historical/{date_stamp}/{df_name}/{df_name}/{df_name}.parquet"
+    latest_file = f"{base_path}/latest/{df_name}/{df_name}/{df_name}.parquet"
+
+    persist_df_parquet(historical_file, df)
+
+    delete_prefix(f"{base_path}/latest/{df_name}/{df_name}")
+    persist_df_parquet(latest_file, df)
+
+
+def save_silver_dag(
+    pipeline_name: str,
+    df_name: str,
+    dag_image: bytes,
+    date_stamp: str,
+) -> None:
+    """Persist a DAG visualization for a silver-layer dataset.
+
+    Behaviour:
+        - Saves historical version under timestamp.
+        - Updates 'latest' DAG image by replacing previous files.
+
+    Args:
+        pipeline_name (str): Pipeline name for namespacing.
+        df_name (str): Name of the dataset associated with the DAG.
+        dag_image (bytes): PNG image bytes of the DAG.
+        date_stamp (str): Canonical timestamp for historical storage.
+    """
+
+    _, data_root = _initialise_environment()
+
+    base_path = f"{data_root}/{pipeline_name}/silver"
+    historical_file = f"{base_path}/historical/{date_stamp}/{df_name}/dag_image/{df_name}.dag.png"
+    latest_file = f"{base_path}/latest/{df_name}/dag_image/{df_name}.dag.png"
+
+    persist(historical_file, dag_image)
+    delete_prefix(f"{base_path}/latest/{df_name}/dag_image/")
     persist(latest_file, dag_image)
