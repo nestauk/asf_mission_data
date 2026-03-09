@@ -55,3 +55,8 @@ Thumbs.db
 # TODO: (can remove once migration is fully complete)
 .recipes/
 .cookiecutter/state/
+
+# CDK context files
+cdk.context.json
+infrastructure/.coverage
+infrastructure/cdk.out/
