@@ -20,7 +20,7 @@ import os
 import aws_cdk as cdk
 from config.dev import DEV_CONFIG
 from config.prod import PROD_CONFIG
-from stacks.core_stack import CoreStack
+from stacks.core import CoreStack
 
 ENVIRONMENTS = {
     "dev": DEV_CONFIG,
