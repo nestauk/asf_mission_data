@@ -52,6 +52,7 @@ repos:
         name: "✨ misc-files · Ensure files end with a newline"
     -   id: trailing-whitespace
         name: "✨ misc-files · Remove trailing whitespace"
+        args: ['--markdown-linebreak-ext=md']
     -   id: check-yaml # validates YAML syntax
         name: "✨ misc-files · Validate YAML files"
         exclude: "docs/mkdocs.yml"
