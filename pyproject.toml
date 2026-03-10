@@ -70,6 +70,9 @@ select = [
 #   "D"   - docstrings (add once pipeline patterns are settled)
 #   "N"   - naming conventions
 #   "C"   - comprehensions + complexity
+#
+# Uncomment to ignore specific rules:
+# ignore = []
 
 [tool.ruff.lint.isort]
 known-first-party = ["asf_mission_data"]
