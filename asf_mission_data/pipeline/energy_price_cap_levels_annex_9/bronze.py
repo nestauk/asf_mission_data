@@ -241,7 +241,7 @@ def latest_file_content(latest_file_url: str) -> bytes:
     return utils.fetch_raw_content(latest_file_url)
 
 
-def latest_file_name(
+def latest_filename(
     latest_file_url: str,
 ) -> str:
     """Extract the file name from data file URL.
@@ -263,7 +263,7 @@ def bronze_metadata(
     publisher: str,
     collection_url: str,
     latest_file_url: str,
-    latest_file_name: str,
+    latest_filename: str,
     latest_price_cap_period: str,
     bronze_ingest_timestamp: str,
     pipeline_version: str,
@@ -278,7 +278,7 @@ def bronze_metadata(
         publisher (str): Name of the data publisher (e.g., "Ofgem").
         collection_url (str): URL of the collection page containing links to download data files.
         latest_file_url (str): URL of the latest data file.
-        latest_file_name (str): Name of the data file.
+        latest_filename (str): Name of the data file.
         latest_price_cap_period (str): The latest price cap period covered by the data file.
         bronze_ingest_timestamp (str): Timestamp when the dataset was ingested.
         pipeline_version (str): Version of the ETL pipeline that ingested the dataset.
@@ -291,18 +291,18 @@ def bronze_metadata(
         "publisher": publisher,
         "collection_url": collection_url,
         "file_url": latest_file_url,
-        "file_name": latest_file_name,
+        "file_name": latest_filename,
         "price_cap_period": latest_price_cap_period,
         "bronze_ingest_timestamp": bronze_ingest_timestamp,
         "pipeline_version": pipeline_version,
-        "citation": f"Source: {publisher}, {latest_file_name}, {latest_price_cap_period}. {collection_url}.",
+        "citation": f"Source: {publisher}, {latest_filename}, {latest_price_cap_period}. {collection_url}.",
     }
 
 
 def bronze_energy_price_cap_annex_9_file(
-    pipeline_name: str,
+    dataset_prefix: str,
     latest_file_content: bytes,
-    latest_file_name: str,
+    latest_filename: str,
     latest_price_cap_period: str,
     bronze_metadata: dict,
 ) -> None:
@@ -320,28 +320,31 @@ def bronze_energy_price_cap_annex_9_file(
 
     Storage structure:
 
-        <data_root>/<pipeline_name>/bronze/
-                ├── historical/<price_cap_period>/file/
-                ├── historical/<price_cap_period>/metadata/
-                └── latest/
-                    ├── file/
-                    └── metadata/
+        <data_root>/data/bronze/<dataset_prefix>/
+            historical/
+                period=<price_cap_period>/
+                    file/<filename>
+                    metadata/<filename>.metadata.json
+            latest/
+                file/<filename>
+                metadata/<filename>.metadata.json
 
     Args:
-        pipeline_name (str): Name of pipeline used to namespace bronze storage.
+        dataset_prefix (str): Dataset identifier used to namespace storage.
         latest_file_content (bytes): Latest dataset file to persist.
-        latest_file_name (str): Latest file name to persist.
+        latest_filename (str): Latest file name to persist.
         latest_price_cap_period (str): The latest price cap period covered by
             the latest data file.
         bronze_metadata (dict): Associated provenance metadata.
     """
 
-    price_cap_period_prefix = latest_price_cap_period.replace(" ", "_")
+    price_cap_period_prefix = f"period={utils.normalise_energy_price_cap_period_string(latest_price_cap_period)}"
 
     storage.ingest_to_bronze(
-        pipeline_name=pipeline_name,
+        layer_prefix="bronze",
+        dataset_prefix=dataset_prefix,
         file=latest_file_content,
-        file_name=latest_file_name,
+        filename=latest_filename,
         date_stamp=price_cap_period_prefix,
         metadata=bronze_metadata,
     )
