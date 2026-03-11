@@ -1,24 +1,68 @@
 repos:
+#
+# ---------------------------------------------------------------------------- #
+#                                Pre-Commit Hooks                             #
+# ---------------------------------------------------------------------------- #
 -   repo: https://gitlab.com/vojko.pribudic.foss/pre-commit-update
     rev: v0.9.0
     hooks:
     -   id: pre-commit-update
+        name: "🔄 pre-commit update · Update pre-commit hooks to the latest versions"
+
+# ----------------------------- 🔒 Security Tools ---------------------------- #
+-   repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0
+    hooks:
+    -   id: gitleaks
+        name: "🔒 security · Detect hardcoded secrets"
+
+
+# --------------------------- Code Quality Tools -------------------------- #
+
+    ### Python Tools ###
+-   repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.5
+    hooks:
+    -   id: ruff-check
+        args: [--fix]
+        name: "🐍 python · Lint and fix with Ruff"
+    -   id: ruff-format
+        name: "🐍 python · Format with Ruff"
+
+-   repo: https://github.com/abravalheri/validate-pyproject
+    rev: v0.25
+    hooks:
+    -   id: validate-pyproject
+        name: "🐍 python · Validate pyproject.toml"
+        additional_dependencies: ["validate-pyproject-schema-store[all]"]
+
+    ### Data & Config Validation ###
+-   repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.37.0
+    hooks:
+    -   id: check-github-workflows
+        name: "🐙 github-actions · Validate gh workflow files"
+        args: ["--verbose"]
+
+    ### Misc File Types ###
 -   repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
-    -   id: check-added-large-files # prevent accidentally adding large files to the repo
-        args: ['--maxkb=500']  # Flag files over 500KB
-    -   id: check-merge-conflict # prevent committing unresolved merge conflicts
-    -   id: end-of-file-fixer # ensure files end with a newline
-    -   id: trailing-whitespace # remove trailing whitespace
-    -   id: check-toml # validates pyproject.toml syntax
+    -   id: end-of-file-fixer
+        name: "✨ misc-files · Ensure files end with a newline"
+    -   id: trailing-whitespace
+        name: "✨ misc-files · Remove trailing whitespace"
+        args: ['--markdown-linebreak-ext=md']
     -   id: check-yaml # validates YAML syntax
+        name: "✨ misc-files · Validate YAML files"
         exclude: "docs/mkdocs.yml"
+# ------------------------------- 🌳 Git Tools ------------------------------- #
+    -   id: check-added-large-files
+        args: ['--maxkb=600']  # set the maximum file size to 600KB
+        name: "🌳 git · Prevent adding files larger than 600KB"
+    -   id: check-merge-conflict
+        name: "🌳 git · Prevent committing unresolved merge conflicts"
     -   id: no-commit-to-branch
+        name: "🌳 git · Prevent committing directly to protected branches"
         args: ["-b", dev]
         pass_filenames: false
--   repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.4
-    hooks:
-    -   id: ruff-format
-    -   id: ruff-check
