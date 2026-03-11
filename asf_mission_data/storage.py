@@ -217,25 +217,20 @@ def save_dag(
     dag_image: bytes,
     date_stamp: str,
 ) -> None:
-    """Persist a DAG visualisation artifact to the bronze storage layer.
-    Stores the generated pipeline DAG image alongside the bronze dataset
-    files for traceability and reproducibility.
+    """Persist a pipeline DAG visualisation artifact for a dataset.
 
-    Behaviour:
-        1. Persist the DAG image to the historical archive.
-        2. Remove any existing DAG image in the "latest" directory.
-        3. Persist the DAG image as the current "latest" version.
+    The function stores a PNG representation of the pipeline DAG to the
+    artifacts storage area. The DAG is archived under a date-based partition
+    to support traceability and reproducibility of pipeline structure at the
+    time of ingestion.
 
-    Storage structure:
-        <data_root>/artifacts/<layer_prefix>/<dataset_prefix>/
-            historical/
-                <date_stamp>/
-                    dag_image/<accompanying_filename>.dag.png
-            latest/
-                dag_image/<accompanying_filename>.dag.png
+    Storage layout:
 
+        <data_root>/artifacts/dags/<layer_prefix>/<dataset_prefix>/
+            <date_stamp>/<accompanying_filename>.dag.png
     Args:
-        layer_prefix (str): Storage namespace representing the data layer (e.g. "bronze").
+        layer_prefix (str): Storage namespace representing the data layer
+            (e.g. "bronze", "silver", "gold").
         dataset_prefix (str): Dataset identifier used to namespace storage.
         accompanying_filename (str): Name of dataset the DAG is associated with.
             Used to construct the DAG file name.
