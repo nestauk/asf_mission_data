@@ -338,13 +338,11 @@ def bronze_energy_price_cap_annex_9_file(
         bronze_metadata (dict): Associated provenance metadata.
     """
 
-    price_cap_period_prefix = f"period={utils.normalise_energy_price_cap_period_string(latest_price_cap_period)}"
-
     storage.ingest_to_bronze(
         layer_prefix="bronze",
         dataset_prefix=dataset_prefix,
         file=latest_file_content,
         filename=latest_filename,
-        date_stamp=price_cap_period_prefix,
+        date_stamp=f"period={utils.normalise_energy_price_cap_period_string(latest_price_cap_period)}",
         metadata=bronze_metadata,
     )

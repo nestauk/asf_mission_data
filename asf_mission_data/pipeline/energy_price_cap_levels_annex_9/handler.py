@@ -78,15 +78,14 @@ def run_bronze_pipeline():
 
     # extract parameters for dag file name
     latest_filename = results["latest_filename"]
-    price_cap_period_prefix = f"period={utils.normalise_energy_price_cap_period_string(results['latest_price_cap_period'])}"
 
     # save dag image
-    storage.save_bronze_dag(
+    storage.save_dag(
         layer_prefix="bronze",
         dataset_prefix=ENERGY_PRICE_CAP_LEVELS_ANNEX_9["dataset_prefix"],
         accompanying_filename=latest_filename,
         dag_image=dag_png,
-        date_stamp=price_cap_period_prefix,
+        date_stamp=f"period={utils.normalise_energy_price_cap_period_string(results['latest_price_cap_period'])}",
     )
 
 
