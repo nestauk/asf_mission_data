@@ -1,5 +1,6 @@
 import logging
 import re
+from datetime import datetime
 
 import pandas as pd
 import requests
@@ -84,3 +85,34 @@ def convert_energy_price_cap_period_string_to_interval(period_str: str) -> pd.In
             period_str,
         )
         raise ValueError("Price cap period string format does not match expected regex pattern.")
+
+
+def normalise_energy_price_cap_period_string(period_str: str) -> str:
+    """Normalise an energy price cap period string into a canonical storage-safe format.
+
+    The input string is expected to represent a date range such as:
+        "1 April to 30 June 2026"
+        "1 January 2026 to 31 March 2026"
+
+    The function converts the range into an ISO-style date format
+    suitable for partitions or dataset version identifiers.
+
+    Example:
+        "1 April to 30 June 2026" -> "2026-04-01_to_2026-06-30"
+
+    Args:
+        period_str (str): Human-readable energy price cap period string.
+
+    Returns:
+        str: A normalised date range string formatted as:
+        "YYYY-MM-DD_to_YYYY-MM-DD".
+    """
+    start_str, end_str = period_str.split(" to ")
+    end = datetime.strptime(end_str, "%d %B %Y")
+
+    if start_str.count(" ") == 1:
+        start_str = f"{start_str} {end.year}"
+
+    start = datetime.strptime(start_str, "%d %B %Y")
+
+    return f"{start:%Y-%m-%d}_to_{end:%Y-%m-%d}"

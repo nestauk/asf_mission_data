@@ -7,7 +7,7 @@ from importlib.metadata import version
 
 from hamilton import driver
 
-from asf_mission_data import storage
+from asf_mission_data import storage, utils
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9 import bronze
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import (
     ENERGY_PRICE_CAP_LEVELS_ANNEX_9,
@@ -38,7 +38,7 @@ def build_bronze_driver() -> driver.Builder:
         .with_modules(bronze)
         .with_config(
             {
-                "pipeline_name": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["pipeline_name"],
+                "dataset_prefix": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["dataset_prefix"],
                 "collection_url": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["collection_url"],
                 "file_link_text": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["file_link_text"],
                 "publisher": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["publisher"],
@@ -64,7 +64,7 @@ def run_bronze_pipeline():
 
     node_targets = [
         "bronze_energy_price_cap_annex_9_file",
-        "latest_file_name",
+        "latest_filename",
         "latest_price_cap_period",
     ]
     results = dr.execute(node_targets)
@@ -77,13 +77,14 @@ def run_bronze_pipeline():
     ).pipe(format="png")
 
     # extract parameters for dag file name
-    latest_file_name = results["latest_file_name"]
-    price_cap_period_prefix = results["latest_price_cap_period"].replace(" ", "_")
+    latest_filename = results["latest_filename"]
+    price_cap_period_prefix = f"period={utils.normalise_energy_price_cap_period_string(results['latest_price_cap_period'])}"
 
     # save dag image
     storage.save_bronze_dag(
-        pipeline_name=ENERGY_PRICE_CAP_LEVELS_ANNEX_9["pipeline_name"],
-        accompanying_file_name=latest_file_name,
+        layer_prefix="bronze",
+        dataset_prefix=ENERGY_PRICE_CAP_LEVELS_ANNEX_9["dataset_prefix"],
+        accompanying_filename=latest_filename,
         dag_image=dag_png,
         date_stamp=price_cap_period_prefix,
     )

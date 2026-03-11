@@ -155,45 +155,49 @@ def delete_prefix(uri_prefix: str) -> None:
 
 
 def ingest_to_bronze(
-    pipeline_name: str,
+    layer_prefix: str,
+    dataset_prefix: str,
     file: bytes | str,
-    file_name: str,
+    filename: str,
     date_stamp: str,
     metadata: dict,
 ) -> None:
     """Persists raw dataset files and associated metadata to the bronze storage layer.
 
     Behaviour:
-        1. Deletes any existing 'latest' bronze files and metadata.
-        2. Saves incoming file and metadata to 'historical' archive.
-        3. Saves incoming file and metadata to 'latest'.
+        1. Persist the incoming dataset and metadata to the historical archive.
+        2. Remove any existing files in the "latest" directory.
+        3. Persist the dataset and metadata as the current "latest" version.
 
     Storage paths are constructed dynamically using the configured DATA_ROOT
     and can be local or remote storage via URI.
 
     Storage structure:
-        <data_root>/<pipeline_name>/bronze/
-            ├── historical/<date_stamp>/file/
-            ├── historical/<date_stamp>/metadata/
-            └── latest/
-                ├── file/
-                └── metadata/
+        <data_root>/data/<layer_prefix>/<dataset_prefix>/
+            historical/
+                <date_stamp>/
+                    file/<filename>
+                    metadata/<filename>.metadata.json
+            latest/
+                file/<filename>
+                metadata/<filename>.metadata.json
 
     Args:
-        pipeline_name (str): Name of pipeline used to namespace bronze storage.
+        layer_prefix (str): Storage namespace representing the data layer (e.g. "bronze").
+        dataset_prefix (str): Dataset identifier used to namespace storage.
         file (bytes | str): Raw dataset content to persist.
-        file_name (str): Name of the dataset file.
-        date_stamp (str): Canonical timestamp or partition identifier for historical storage.
+        filename (str): Name of the dataset file.
+        date_stamp (str): Canonical timestamp or partition identifier for historical archiving.
         metadata (dict): Provenance metadata associated with dataset.
     """
 
     data_mode, data_root = _initialise_environment()
 
-    base_path = f"{data_root}/{pipeline_name}/bronze"
-    historical_file = f"{base_path}/historical/{date_stamp}/file/{file_name}"
-    historical_metadata = f"{base_path}/historical/{date_stamp}/metadata/{file_name}.metadata.json"
-    latest_file = f"{base_path}/latest/file/{file_name}"
-    latest_metadata = f"{base_path}/latest/metadata/{file_name}.metadata.json"
+    base_path = f"{data_root}/data/{layer_prefix}/{dataset_prefix}"
+    historical_file = f"{base_path}/historical/{date_stamp}/file/{filename}"
+    historical_metadata = f"{base_path}/historical/{date_stamp}/metadata/{filename}.metadata.json"
+    latest_file = f"{base_path}/latest/file/{filename}"
+    latest_metadata = f"{base_path}/latest/metadata/{filename}.metadata.json"
 
     persist(historical_file, file)
     persist(historical_metadata, metadata)
@@ -205,8 +209,9 @@ def ingest_to_bronze(
 
 
 def save_bronze_dag(
-    pipeline_name: str,
-    accompanying_file_name: str,
+    layer_prefix: str,
+    dataset_prefix: str,
+    accompanying_filename: str,
     dag_image: bytes,
     date_stamp: str,
 ) -> None:
@@ -215,20 +220,22 @@ def save_bronze_dag(
     files for traceability and reproducibility.
 
     Behaviour:
-        - Deletes any existing 'latest' DAG visualisation.
-        - Saves DAG image to 'historical' archive.
-        - Saves DAG image to 'latest'.
+        1. Persist the DAG image to the historical archive.
+        2. Remove any existing DAG image in the "latest" directory.
+        3. Persist the DAG image as the current "latest" version.
 
     Storage structure:
-        <data_root>/<pipeline_name>/bronze/
-            ├── historical/<date_stamp>/dag_image/
-            │       └── <accompanying_file_name>.dag.png
-            └── latest/dag_image/
-                    └── <accompanying_file_name>.dag.png
+        <data_root>/artifacts/<layer_prefix>/<dataset_prefix>/
+            historical/
+                <date_stamp>/
+                    dag_image/<accompanying_filename>.dag.png
+            latest/
+                dag_image/<accompanying_filename>.dag.png
 
     Args:
-        pipeline_name (str): Name of pipeline used to namespace bronze storage.
-        accompanying_file_name (str): Name of dataset the DAG is associated with.
+        layer_prefix (str): Storage namespace representing the data layer (e.g. "bronze").
+        dataset_prefix (str): Dataset identifier used to namespace storage.
+        accompanying_filename (str): Name of dataset the DAG is associated with.
             Used to construct the DAG file name.
         dag_image (bytes): PNG image representing the DAG visualisation.
             Constructed by the Hamilton driver.
@@ -237,10 +244,6 @@ def save_bronze_dag(
 
     data_mode, data_root = _initialise_environment()
 
-    base_path = f"{data_root}/{pipeline_name}/bronze"
-    historical_file = f"{base_path}/historical/{date_stamp}/dag_image/{accompanying_file_name}.dag.png"
-    latest_file = f"{base_path}/latest/dag_image/{accompanying_file_name}.dag.png"
-
+    base_path = f"{data_root}/artifacts/dags/{layer_prefix}/{dataset_prefix}"
+    historical_file = f"{base_path}/{date_stamp}/{accompanying_filename}.dag.png"
     persist(historical_file, dag_image)
-    delete_prefix(f"{base_path}/latest/dag_image/")
-    persist(latest_file, dag_image)
