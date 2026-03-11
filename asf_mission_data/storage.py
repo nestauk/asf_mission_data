@@ -156,12 +156,12 @@ def delete_prefix(uri_prefix: str) -> None:
 
 
 def ingest_to_bronze(
-    layer_prefix: str,
     dataset_prefix: str,
     file: bytes | str,
     filename: str,
     date_stamp: str,
     metadata: dict,
+    layer_prefix: str = "bronze",
 ) -> None:
     """Persists raw dataset files and associated metadata to the bronze storage layer.
 
@@ -184,12 +184,13 @@ def ingest_to_bronze(
                 metadata/<filename>.metadata.json
 
     Args:
-        layer_prefix (str): Storage namespace representing the data layer (e.g. "bronze").
         dataset_prefix (str): Dataset identifier used to namespace storage.
         file (bytes | str): Raw dataset content to persist.
         filename (str): Name of the dataset file.
         date_stamp (str): Canonical timestamp or partition identifier for historical archiving.
         metadata (dict): Provenance metadata associated with dataset.
+        layer_prefix (str): Storage namespace representing the data layer (e.g. "bronze").
+            Defaults to "bronze".
     """
 
     data_mode, data_root = _initialise_environment()
@@ -209,7 +210,7 @@ def ingest_to_bronze(
     persist(latest_metadata, metadata)
 
 
-def save_bronze_dag(
+def save_dag(
     layer_prefix: str,
     dataset_prefix: str,
     accompanying_filename: str,
@@ -250,13 +251,19 @@ def save_bronze_dag(
     persist(historical_file, dag_image)
 
 
-def locate_latest_bronze(pipeline_name: str, file_or_metadata: str = "file") -> str:
+def locate_latest_bronze(
+    dataset_prefix: str,
+    file_or_metadata: str = "file",
+    layer_prefix: str = "bronze",
+) -> str:
     """Locate the latest bronze dataset file or metadata for a given pipeline.
 
     Args:
-        pipeline_name (str): Name of the pipeline.
+        dataset_prefix (str): Dataset identifier used to namespace storage.
         file_or_metadata (str, optional): Either 'file' or 'metadata'.
             Defaults to "file".
+        layer_prefix (str): Storage namespace representing the data layer (e.g. "bronze").
+            Defaults to "bronze".
 
     Raises:
         ValueError: If `file_or_metadata` is not 'file' or 'metadata'.
@@ -270,7 +277,7 @@ def locate_latest_bronze(pipeline_name: str, file_or_metadata: str = "file") -> 
 
     _, data_root = _initialise_environment()
 
-    uri_prefix = f"{data_root}/{pipeline_name}/bronze/latest/{file_or_metadata}"
+    uri_prefix = f"{data_root}/data/{layer_prefix}/{dataset_prefix}/latest/{file_or_metadata}"
 
     fs, path = fsspec.core.url_to_fs(uri_prefix)
 
@@ -360,10 +367,11 @@ def persist_df_parquet(uri: str, df: pd.DataFrame) -> None:
 
 
 def ingest_to_silver(
-    pipeline_name: str,
+    dataset_prefix: str,
     df: pd.DataFrame,
     df_name: str,
     date_stamp: str,
+    layer_prefix: str = "silver",
 ) -> None:
     """Save a DataFrame to the silver storage layer.
 
@@ -372,49 +380,21 @@ def ingest_to_silver(
         - Updates the 'latest' version by replacing previous files.
 
     Args:
-        pipeline_name (str): Pipeline name used for namespacing.
+        dataset_prefix (str): Dataset identifier used to namespace storage.
         df (pd.DataFrame): DataFrame to persist.
         df_name (str): Name of the DataFrame (used in storage paths).
         date_stamp (str): Canonical timestamp for historical storage.
+        layer_prefix (str): Storage namespace representing the data layer (e.g. "silver").
+            Defaults to "silver".
     """
 
     _, data_root = _initialise_environment()
 
-    base_path = f"{data_root}/{pipeline_name}/silver"
-    historical_file = f"{base_path}/historical/{date_stamp}/{df_name}/{df_name}/{df_name}.parquet"
-    latest_file = f"{base_path}/latest/{df_name}/{df_name}/{df_name}.parquet"
+    base_path = f"{data_root}/data/{layer_prefix}/{dataset_prefix}"
+    historical_file = f"{base_path}/historical/{date_stamp}/{df_name}/{df_name}.parquet"
+    latest_file = f"{base_path}/latest/{df_name}/{df_name}.parquet"
 
     persist_df_parquet(historical_file, df)
 
-    delete_prefix(f"{base_path}/latest/{df_name}/{df_name}")
+    delete_prefix(f"{base_path}/latest/{df_name}")
     persist_df_parquet(latest_file, df)
-
-
-def save_silver_dag(
-    pipeline_name: str,
-    df_name: str,
-    dag_image: bytes,
-    date_stamp: str,
-) -> None:
-    """Persist a DAG visualization for a silver-layer dataset.
-
-    Behaviour:
-        - Saves historical version under timestamp.
-        - Updates 'latest' DAG image by replacing previous files.
-
-    Args:
-        pipeline_name (str): Pipeline name for namespacing.
-        df_name (str): Name of the dataset associated with the DAG.
-        dag_image (bytes): PNG image bytes of the DAG.
-        date_stamp (str): Canonical timestamp for historical storage.
-    """
-
-    _, data_root = _initialise_environment()
-
-    base_path = f"{data_root}/{pipeline_name}/silver"
-    historical_file = f"{base_path}/historical/{date_stamp}/{df_name}/dag_image/{df_name}.dag.png"
-    latest_file = f"{base_path}/latest/{df_name}/dag_image/{df_name}.dag.png"
-
-    persist(historical_file, dag_image)
-    delete_prefix(f"{base_path}/latest/{df_name}/dag_image/")
-    persist(latest_file, dag_image)

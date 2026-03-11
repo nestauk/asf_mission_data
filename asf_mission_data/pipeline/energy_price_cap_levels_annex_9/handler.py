@@ -78,21 +78,20 @@ def run_bronze_pipeline():
 
     # extract parameters for dag file name
     latest_filename = results["latest_filename"]
-    price_cap_period_prefix = f"period={utils.normalise_energy_price_cap_period_string(results['latest_price_cap_period'])}"
 
     # save dag image
-    storage.save_bronze_dag(
+    storage.save_dag(
         layer_prefix="bronze",
         dataset_prefix=ENERGY_PRICE_CAP_LEVELS_ANNEX_9["dataset_prefix"],
         accompanying_filename=latest_filename,
         dag_image=dag_png,
-        date_stamp=price_cap_period_prefix,
+        date_stamp=f"period={utils.normalise_energy_price_cap_period_string(results['latest_price_cap_period'])}",
     )
 
 
 # TODO refactor to be more generic and move to common module
 # TODO naming convention for different silver DAG drivers
-def build_silver_tariff_tables_driver() -> driver.Builder:
+def build_silver_1c_consumption_adjusted_levels_driver() -> driver.Builder:
     """Construct a Hamilton driver for the silver layer processing of tariff tables.
 
     This driver is configured with the `silver` nodes module and the relevant
@@ -103,17 +102,12 @@ def build_silver_tariff_tables_driver() -> driver.Builder:
         driver.Builder: Configured Hamilton driver ready to execute the silver ETL graph.
     """
 
+    sheet_name = "1c Consumption adjusted levels"  # TODO refactor
+
     dr = (
         driver.Builder()
         .with_modules(silver)
-        .with_config(
-            {
-                "pipeline_name": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["pipeline_name"],
-                "sheet_name": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["silver_datasets"][
-                    "tariff_tables"  # TODO design config
-                ],
-            }
-        )
+        .with_config({"dataset_prefix": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["dataset_prefix"], "sheet_name": sheet_name})
         .build()
     )
     return dr
@@ -133,28 +127,33 @@ def run_silver_pipeline():
         silver datasets are processed.
     """
 
-    tariff_tables_dr = build_silver_tariff_tables_driver()
-    # add more drivers here as we build more silver DAGs
+    # ----------------------------------
+    # Silver dataset 1: Tariff tables
+    # ----------------------------------
+
+    consumption_adjusted_levels_dr = build_silver_1c_consumption_adjusted_levels_driver()
+    sheet_name = "1c Consumption adjusted levels"  # TODO refactor
 
     node_targets = [
         "silver_energy_price_cap_annex_9_tariff_tables_parquet",
         "latest_price_cap_period",
     ]
-    results = tariff_tables_dr.execute(node_targets)
+    results = consumption_adjusted_levels_dr.execute(node_targets)
 
     # generate dag image
-    dag_png = tariff_tables_dr.visualize_execution(
+    dag_png = consumption_adjusted_levels_dr.visualize_execution(
         ["silver_energy_price_cap_annex_9_tariff_tables_parquet"],
         None,
         render_kwargs={},
     ).pipe(format="png")
 
     # save dag image
-    storage.save_silver_dag(
-        pipeline_name=ENERGY_PRICE_CAP_LEVELS_ANNEX_9["pipeline_name"],
-        df_name="tariff_tables",  # TODO design config
+    storage.save_dag(
+        layer_prefix="silver",
+        dataset_prefix=ENERGY_PRICE_CAP_LEVELS_ANNEX_9["dataset_prefix"],
+        accompanying_filename=sheet_name.lower().replace(" ", "_"),
         dag_image=dag_png,
-        date_stamp=results["latest_price_cap_period"].replace(" ", "_"),
+        date_stamp=f"period={utils.normalise_energy_price_cap_period_string(results['latest_price_cap_period'])}",
     )
 
 

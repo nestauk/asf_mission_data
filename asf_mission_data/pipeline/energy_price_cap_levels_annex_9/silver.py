@@ -24,16 +24,16 @@ logger = logging.getLogger(__name__)
 # ----------------------------------
 
 
-def bronze_energy_price_cap_annex_9_file(pipeline_name: str) -> str:
+def bronze_energy_price_cap_annex_9_file(dataset_prefix: str) -> str:
     """Locate the latest bronze-layer Excel file for the Energy Price Cap Annex 9 pipeline.
 
     Args:
-        pipeline_name (str): Name of the pipeline used to locate the bronze dataset.
+        dataset_prefix (str): Prefix used to locate the bronze dataset.
 
     Returns:
         str: URI or file path to the latest bronze Excel file containing tariff tables.
     """
-    return storage.locate_latest_bronze(pipeline_name, "file")
+    return storage.locate_latest_bronze(dataset_prefix, "file")
 
 
 def tariff_tables_excel_sheet_df(bronze_energy_price_cap_annex_9_file: str, sheet_name: str) -> pd.DataFrame:
@@ -49,7 +49,7 @@ def tariff_tables_excel_sheet_df(bronze_energy_price_cap_annex_9_file: str, shee
     return storage.read_excel_sheet(bronze_energy_price_cap_annex_9_file, sheet_name)
 
 
-def bronze_energy_price_cap_annex_9_metadata(pipeline_name: str) -> dict:
+def bronze_energy_price_cap_annex_9_metadata(dataset_prefix: str) -> dict:
     """Load metadata associated with the latest bronze dataset.
 
     Args:
@@ -58,7 +58,7 @@ def bronze_energy_price_cap_annex_9_metadata(pipeline_name: str) -> dict:
     Returns:
         dict: Dictionary containing metadata fields such as price cap period and source information.
     """
-    metadata_uri = storage.locate_latest_bronze(pipeline_name, "metadata")
+    metadata_uri = storage.locate_latest_bronze(dataset_prefix, "metadata")
     return storage.read_json(metadata_uri)
 
 
@@ -547,25 +547,28 @@ def latest_price_cap_period(
 
 def silver_energy_price_cap_annex_9_tariff_tables_parquet(
     all_tariff_tables_tidy_with_metadata_df: pd.DataFrame,
-    pipeline_name: str,
+    dataset_prefix: str,
     latest_price_cap_period: str,
+    sheet_name: str,
 ) -> str:
     """Persist the silver-layer tariff tables dataset to storage as a parquet file.
 
     Args:
         all_tariff_tables_tidy_with_metadata_df (pd.DataFrame): Final processed dataset.
-        pipeline_name (str): Pipeline identifier.
+        dataset_prefix (str): Dataset identifier used to namespace storage.
         latest_price_cap_period (str): Period used to timestamp the dataset.
 
     Returns:
         str: URI of the stored silver dataset.
     """
 
+    price_cap_period_prefix = f"period={utils.normalise_energy_price_cap_period_string(latest_price_cap_period)}"
+
     storage.ingest_to_silver(
-        pipeline_name=pipeline_name,
+        dataset_prefix=dataset_prefix,
         df=all_tariff_tables_tidy_with_metadata_df,
-        df_name="tariff_tables",
-        date_stamp=latest_price_cap_period.replace(" ", "_"),
+        df_name=sheet_name.lower().replace(" ", "_"),
+        date_stamp=price_cap_period_prefix,
     )
 
 
