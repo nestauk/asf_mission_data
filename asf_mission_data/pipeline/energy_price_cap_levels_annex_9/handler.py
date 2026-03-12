@@ -135,14 +135,14 @@ def run_silver_pipeline():
     sheet_name = "1c Consumption adjusted levels"  # TODO refactor
 
     node_targets = [
-        "silver_energy_price_cap_annex_9_tariff_tables_parquet",
+        "silver_energy_price_cap_annex_9_1c_consumption_adjusted_levels_parquet",
         "latest_price_cap_period",
     ]
     results = consumption_adjusted_levels_dr.execute(node_targets)
 
     # generate dag image
     dag_png = consumption_adjusted_levels_dr.visualize_execution(
-        ["silver_energy_price_cap_annex_9_tariff_tables_parquet"],
+        ["silver_energy_price_cap_annex_9_1c_consumption_adjusted_levels_parquet"],
         None,
         render_kwargs={},
     ).pipe(format="png")

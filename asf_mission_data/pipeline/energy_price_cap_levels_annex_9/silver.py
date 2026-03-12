@@ -18,9 +18,8 @@ from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.schemas import (
 
 logger = logging.getLogger(__name__)
 
-
 # ----------------------------------
-# Silver dataset 1: Tariff tables
+# Common silver nodes
 # ----------------------------------
 
 
@@ -31,20 +30,20 @@ def bronze_energy_price_cap_annex_9_file(dataset_prefix: str) -> str:
         dataset_prefix (str): Prefix used to locate the bronze dataset.
 
     Returns:
-        str: URI or file path to the latest bronze Excel file containing tariff tables.
+        str: URI or file path to the latest bronze Excel file.
     """
     return storage.locate_latest_bronze(dataset_prefix, "file")
 
 
-def tariff_tables_excel_sheet_df(bronze_energy_price_cap_annex_9_file: str, sheet_name: str) -> pd.DataFrame:
-    """Load the tariff tables worksheet from the bronze Excel file.
+def excel_sheet_df(bronze_energy_price_cap_annex_9_file: str, sheet_name: str) -> pd.DataFrame:
+    """Load the a target worksheet from the bronze Excel file.
 
     Args:
         bronze_energy_price_cap_annex_9_file (str): Path to the bronze Excel file.
-        sheet_name (str): Name of the worksheet tab containing tariff tables.
+        sheet_name (str): Name of the worksheet tab.
 
     Returns:
-        pd.DataFrame: DataFrame containing the raw tariff tables sheet.
+        pd.DataFrame: DataFrame containing raw data in the sheet.
     """
     return storage.read_excel_sheet(bronze_energy_price_cap_annex_9_file, sheet_name)
 
@@ -60,6 +59,12 @@ def bronze_energy_price_cap_annex_9_metadata(dataset_prefix: str) -> dict:
     """
     metadata_uri = storage.locate_latest_bronze(dataset_prefix, "metadata")
     return storage.read_json(metadata_uri)
+
+
+# ----------------------------------
+# Silver dataset 1
+# 1c Consumption adjusted levels table
+# ----------------------------------
 
 
 # Helper for payment method and fuel combinations
@@ -100,7 +105,7 @@ def _construct_node_name(fuel_key: str, payment_key: str, step: str) -> str:
     return f"{fuel_key}_{payment_key}_{step}"
 
 
-def _get_payment_method_table_range(tariff_tables_excel_sheet_df: pd.DataFrame, payment_method: str) -> tuple[int, int]:
+def _get_payment_method_table_range(excel_sheet_df: pd.DataFrame, payment_method: str) -> tuple[int, int]:
     """Identify the row range corresponding to a payment method tariff table.
 
     The function finds the start row where the payment method header appears
@@ -116,7 +121,7 @@ def _get_payment_method_table_range(tariff_tables_excel_sheet_df: pd.DataFrame, 
     """
 
     # Find the first row of the payment method section
-    header_matches = tariff_tables_excel_sheet_df.index[tariff_tables_excel_sheet_df["Unnamed: 1"] == payment_method].tolist()
+    header_matches = excel_sheet_df.index[excel_sheet_df["Unnamed: 1"] == payment_method].tolist()
 
     if not header_matches:
         raise ValueError(f"Could not find payment method header '{payment_method}'.")
@@ -124,11 +129,7 @@ def _get_payment_method_table_range(tariff_tables_excel_sheet_df: pd.DataFrame, 
     start_index = header_matches[0]
 
     # Only dual fuel tables have Total inc VAT row
-    dual_fuel_cols = [
-        col
-        for col in tariff_tables_excel_sheet_df.columns
-        if tariff_tables_excel_sheet_df[col].astype(str).str.contains("Dual fuel", regex=False).any()
-    ]
+    dual_fuel_cols = [col for col in excel_sheet_df.columns if excel_sheet_df[col].astype(str).str.contains("Dual fuel", regex=False).any()]
 
     if not dual_fuel_cols:
         raise KeyError("Could not find a column containing 'Dual fuel'.")
@@ -136,8 +137,8 @@ def _get_payment_method_table_range(tariff_tables_excel_sheet_df: pd.DataFrame, 
     dual_fuel_header_column = dual_fuel_cols[0]
 
     # Find row indices for "Total inc VAT" that occur after the start index
-    possible_table_end_indices = tariff_tables_excel_sheet_df.index[
-        (tariff_tables_excel_sheet_df[dual_fuel_header_column] == "Total inc VAT") & (tariff_tables_excel_sheet_df.index > start_index)
+    possible_table_end_indices = excel_sheet_df.index[
+        (excel_sheet_df[dual_fuel_header_column] == "Total inc VAT") & (excel_sheet_df.index > start_index)
     ].tolist()
 
     if len(possible_table_end_indices) < 2:
@@ -158,7 +159,7 @@ def _get_payment_method_table_range(tariff_tables_excel_sheet_df: pd.DataFrame, 
     raw_standard_credit_table_df={"payment_method": value("Standard Credit")},
     raw_ppm_table_df={"payment_method": value("PPM")},
 )
-def raw_payment_method_table_df(tariff_tables_excel_sheet_df: pd.DataFrame, payment_method: str) -> pd.DataFrame:
+def raw_payment_method_table_df(excel_sheet_df: pd.DataFrame, payment_method: str) -> pd.DataFrame:
     """Extract the raw tariff table for a specific payment method.
 
     Args:
@@ -168,9 +169,9 @@ def raw_payment_method_table_df(tariff_tables_excel_sheet_df: pd.DataFrame, paym
     Returns:
         pd.DataFrame: DataFrame containing the table slice for the specified payment method.
     """
-    start_index, end_index = _get_payment_method_table_range(tariff_tables_excel_sheet_df, payment_method)
+    start_index, end_index = _get_payment_method_table_range(excel_sheet_df, payment_method)
 
-    df_slice = tariff_tables_excel_sheet_df.iloc[start_index : end_index + 1, :].copy()
+    df_slice = excel_sheet_df.iloc[start_index : end_index + 1, :].copy()
 
     # Check slice is expected payment method section
     header = str(df_slice.iloc[0, 1]).strip()
@@ -505,6 +506,7 @@ def all_tariff_tables_tidy_with_metadata_df(
     all_tariff_tables_tidy_df: pd.DataFrame,
     charge_restriction_period_dates: pd.DataFrame,
     bronze_energy_price_cap_annex_9_metadata: dict[str, str],
+    sheet_name: str,
 ) -> pd.DataFrame:
     """Add parsed dates and metadata to the tidy tariff tables dataset.
 
@@ -518,7 +520,12 @@ def all_tariff_tables_tidy_with_metadata_df(
     for col_name, series in charge_restriction_period_dates.items():
         df[col_name] = series
 
-    df["metadata"] = [bronze_energy_price_cap_annex_9_metadata] * len(df)
+    # add a new field to metadata
+    silver_energy_price_cap_annex_9_metadata = bronze_energy_price_cap_annex_9_metadata.copy()
+    silver_energy_price_cap_annex_9_metadata["excel_sheet_name"] = sheet_name
+    # TODO add sheet_name to human-readable citation field
+
+    df["metadata"] = [silver_energy_price_cap_annex_9_metadata] * len(df)
 
     df["value"] = pd.to_numeric(df["value"], errors="coerce")
     string_cols = [
@@ -545,13 +552,13 @@ def latest_price_cap_period(
     return bronze_energy_price_cap_annex_9_metadata.get("price_cap_period")
 
 
-def silver_energy_price_cap_annex_9_tariff_tables_parquet(
+def silver_energy_price_cap_annex_9_1c_consumption_adjusted_levels_parquet(
     all_tariff_tables_tidy_with_metadata_df: pd.DataFrame,
     dataset_prefix: str,
     latest_price_cap_period: str,
     sheet_name: str,
 ) -> str:
-    """Persist the silver-layer tariff tables dataset to storage as a parquet file.
+    """Persist the silver-layer 1c Consumption adjusted levels dataset to storage as a parquet file.
 
     Args:
         all_tariff_tables_tidy_with_metadata_df (pd.DataFrame): Final processed dataset.
