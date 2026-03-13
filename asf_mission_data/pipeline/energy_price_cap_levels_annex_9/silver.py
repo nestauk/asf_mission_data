@@ -61,6 +61,17 @@ def bronze_energy_price_cap_annex_9_metadata(dataset_prefix: str) -> dict:
     return storage.read_json(metadata_uri)
 
 
+def latest_price_cap_period(
+    bronze_energy_price_cap_annex_9_metadata: dict[str, str],
+) -> str:
+    """Extract the latest price cap period from the bronze metadata.
+
+    Returns:
+        str: Price cap period string.
+    """
+    return bronze_energy_price_cap_annex_9_metadata.get("price_cap_period")
+
+
 # ----------------------------------
 # Silver dataset 1
 # 1c Consumption adjusted levels table
@@ -539,17 +550,6 @@ def all_tariff_tables_tidy_with_metadata_df(
         if col in df.columns:
             df[col] = df[col].astype(str)
     return df
-
-
-def latest_price_cap_period(
-    bronze_energy_price_cap_annex_9_metadata: dict[str, str],
-) -> str:
-    """Extract the latest price cap period from the bronze metadata.
-
-    Returns:
-        str: Price cap period string.
-    """
-    return bronze_energy_price_cap_annex_9_metadata.get("price_cap_period")
 
 
 def silver_energy_price_cap_annex_9_1c_consumption_adjusted_levels_parquet(
