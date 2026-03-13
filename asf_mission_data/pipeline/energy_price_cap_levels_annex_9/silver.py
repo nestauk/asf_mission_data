@@ -13,7 +13,7 @@ from hamilton.function_modifiers import (
 
 from asf_mission_data import storage, utils
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.schemas import (
-    SILVER_TARIFF_TABLES_SCHEMA,
+    SILVER_1C_CONSUMPTION_ADJUSTED_LEVELS_SCHEMA,
 )
 
 logger = logging.getLogger(__name__)
@@ -501,7 +501,7 @@ def charge_restriction_period_dates(
     )
 
 
-@check_output(schema=SILVER_TARIFF_TABLES_SCHEMA, importance="fail")
+@check_output(schema=SILVER_1C_CONSUMPTION_ADJUSTED_LEVELS_SCHEMA, importance="fail")
 def all_tariff_tables_tidy_with_metadata_df(
     all_tariff_tables_tidy_df: pd.DataFrame,
     charge_restriction_period_dates: pd.DataFrame,
@@ -510,7 +510,7 @@ def all_tariff_tables_tidy_with_metadata_df(
 ) -> pd.DataFrame:
     """Add parsed dates and metadata to the tidy tariff tables dataset.
 
-    Ensures the dataset conforms to the SILVER_TARIFF_TABLES_SCHEMA.
+    Ensures the dataset conforms to the SILVER_1C_CONSUMPTION_ADJUSTED_LEVELS_SCHEMA.
 
     Returns:
         pd.DataFrame: Validated silver-layer tariff tables dataset.

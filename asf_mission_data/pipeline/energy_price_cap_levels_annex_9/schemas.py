@@ -4,7 +4,7 @@ import pandas as pd
 import pandera.pandas as pa
 from pandera import Check, Column
 
-SILVER_TARIFF_TABLES_SCHEMA = pa.DataFrameSchema(
+SILVER_1C_CONSUMPTION_ADJUSTED_LEVELS_SCHEMA = pa.DataFrameSchema(
     {
         "Payment method": Column(str, Check.isin(["Other Payment Method", "Standard Credit", "PPM"])),
         "Fuel": Column(str),
