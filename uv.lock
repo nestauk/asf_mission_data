@@ -246,12 +246,6 @@ dependencies = [
     { name = "sf-hamilton" },
 ]
 
-[package.optional-dependencies]
-infrastructure = [
-    { name = "aws-cdk-lib" },
-    { name = "constructs" },
-]
-
 [package.dev-dependencies]
 dev = [
     { name = "boto3-stubs", extra = ["cloudformation", "lambda", "s3"] },
@@ -270,12 +264,15 @@ dev = [
     { name = "types-requests" },
     { name = "validate-pyproject", extra = ["all"] },
 ]
+infrastructure = [
+    { name = "aws-cdk-lib" },
+    { name = "constructs" },
+    { name = "typeguard" },
+]
 
 [package.metadata]
 requires-dist = [
-    { name = "aws-cdk-lib", marker = "extra == 'infrastructure'", specifier = ">=2.170.0" },
     { name = "boto3", specifier = ">=1.42.42" },
-    { name = "constructs", marker = "extra == 'infrastructure'", specifier = ">=10.0.0,<11.0.0" },
     { name = "pandas", specifier = ">=2.2.0" },
     { name = "pandera", specifier = ">=0.20.0" },
     { name = "pyarrow", specifier = ">=14.0.0" },
@@ -284,7 +281,6 @@ requires-dist = [
     { name = "s3fs", specifier = ">=2024.2.0" },
     { name = "sf-hamilton", specifier = ">=1.89.0" },
 ]
-provides-extras = ["infrastructure"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -303,6 +299,11 @@ dev = [
     { name = "types-pyyaml", specifier = ">=6.0.12.20250915" },
     { name = "types-requests", specifier = ">=2.32.4.20260107" },
     { name = "validate-pyproject", extras = ["all"], specifier = ">=0.25" },
+]
+infrastructure = [
+    { name = "aws-cdk-lib", specifier = ">=2.170.0" },
+    { name = "constructs", specifier = ">=10.3.2,<11.0.0" },
+    { name = "typeguard", specifier = "==2.13.3" },
 ]
 
 [[package]]

@@ -25,12 +25,6 @@ dependencies = [
 repository = "https://github.com/nestauk/asf_mission_data"
 issues = "https://github.com/nestauk/asf_mission_data/issues"
 
-[project.optional-dependencies]
-infrastructure = [
-    "aws-cdk-lib>=2.170.0",
-    "constructs>=10.0.0,<11.0.0",
-]
-
 [dependency-groups]
 dev = [
     "pytest>=8.0.0",
@@ -48,6 +42,12 @@ dev = [
     "types-requests>=2.32.4.20260107",
     "pytest-mock>=3.15.1",
     "validate-pyproject[all]>=0.25",
+]
+
+infrastructure = [
+    "aws-cdk-lib>=2.170.0",
+    "constructs>=10.3.2,<11.0.0",
+    "typeguard==2.13.3",
 ]
 
 [tool.hatch.build.targets.wheel]
