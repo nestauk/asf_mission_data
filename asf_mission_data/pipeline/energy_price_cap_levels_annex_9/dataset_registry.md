@@ -104,7 +104,23 @@ TBD.
 | Dataset   |    Fuel price by component           |
 |-----------|--------------------------------------|
 | Source silver dataset | 1c_consumption_adjusted_levels.parquet
-| Output Hamilton node  | `gold.gold_fuel_price_components_parquet()`
-| S3        | {S3 prefix}/`TODO`.parquet
+| Output Hamilton node  | `gold.gold_tariff_component_rates_parquet()`
+| S3        | {S3 prefix}/`tariff_component_rates`.parquet
+| DuckLake  | TBD
+| Superset  | TBD
+
+| Dataset   |    Fuel price by component           |
+|-----------|--------------------------------------|
+| Source silver dataset | 1c_consumption_adjusted_levels.parquet
+| Output Hamilton node  | `gold.gold_unit_rates_with_ratios_parquet()`
+| S3        | {S3 prefix}/`unit_rates_with_ratios`.parquet
+| DuckLake  | TBD
+| Superset  | TBD
+
+| Dataset   |    Fuel price by component           |
+|-----------|--------------------------------------|
+| Source silver dataset | 1c_consumption_adjusted_levels.parquet
+| Output Hamilton node  | `gold.gold_standing_charges_parquet()`
+| S3        | {S3 prefix}/`standing_charges`.parquet
 | DuckLake  | TBD
 | Superset  | TBD

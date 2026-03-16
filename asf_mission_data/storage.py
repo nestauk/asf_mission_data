@@ -393,3 +393,90 @@ def ingest_to_silver(
 
     delete_prefix(f"{base_path}/latest/{df_name}")
     persist_df_parquet(latest_file, df)
+
+
+def locate_latest_silver(
+    dataset_prefix: str,
+    silver_table_prefix: str,
+    layer_prefix: str = "silver",
+) -> str:
+    """Locate the latest silver parquet file for a given pipeline.
+
+    Args:
+        dataset_prefix (str): Dataset identifier used to namespace storage.
+        layer_prefix (str): Storage namespace representing the data layer.
+            Defaults to "silver".
+
+    Returns:
+        str: URI of the latest bronze file or metadata, or None if not found.
+    """
+
+    _, data_root = _initialise_environment()
+
+    uri_prefix = f"{data_root}/data/{layer_prefix}/{dataset_prefix}/latest/{silver_table_prefix}"
+
+    fs, path = fsspec.core.url_to_fs(uri_prefix)
+
+    if not fs.exists(path):
+        logger.info("Prefix does not exist: %s", uri_prefix)
+        return
+
+    files = fs.glob(path + "/*")
+
+    files = [f for f in files if fs.isfile(f)]
+
+    if not files:
+        logger.error("No files found under prefix: %s", uri_prefix)
+        return
+
+    logger.info(
+        "Found %d item(s) under prefix: %s",
+        len(files),
+        uri_prefix,
+    )
+
+    return fs.unstrip_protocol(files[0])
+
+
+def read_parquet(parquet_uri: str) -> pd.DataFrame:
+    try:
+        with fsspec.open(parquet_uri, mode="rb") as f:
+            df = pd.read_parquet(f)
+        return df
+    except Exception as e:
+        logger.error(f"Failed to read parquet file {parquet_uri}: {e}")
+        raise e
+
+
+def ingest_to_gold(
+    dataset_prefix: str,
+    df: pd.DataFrame,
+    df_name: str,
+    date_stamp: str,
+    layer_prefix: str = "gold",
+) -> None:
+    """Save a DataFrame to the gold storage layer.
+
+    Behaviour:
+        - Stores a historical version with timestamp.
+        - Updates the 'latest' version by replacing previous files.
+
+    Args:
+        dataset_prefix (str): Dataset identifier used to namespace storage.
+        df (pd.DataFrame): DataFrame to persist.
+        df_name (str): Name of the DataFrame (used in storage paths).
+        date_stamp (str): Canonical timestamp for historical storage.
+        layer_prefix (str): Storage namespace representing the data layer (e.g. "gold").
+            Defaults to "gold".
+    """
+
+    _, data_root = _initialise_environment()
+
+    base_path = f"{data_root}/data/{layer_prefix}/{dataset_prefix}"
+    historical_file = f"{base_path}/historical/{date_stamp}/{df_name}/{df_name}.parquet"
+    latest_file = f"{base_path}/latest/{df_name}/{df_name}.parquet"
+
+    persist_df_parquet(historical_file, df)
+
+    delete_prefix(f"{base_path}/latest/{df_name}")
+    persist_df_parquet(latest_file, df)
