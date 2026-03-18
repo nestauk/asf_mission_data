@@ -175,87 +175,13 @@ def build_gold_driver() -> driver.Builder:  # TODO this is for gold tables from 
 def run_gold_pipeline():
 
     gold_dr = build_gold_driver()
+    gold_dr.execute(["gold_1c_consumption_adjusted_levels_with_vat_parquet"])
+    gold_dr.execute(["gold_tariff_component_rates_parquet"])
+    gold_dr.execute(["gold_total_unit_rates_with_ratios_parquet"])
+    gold_dr.execute(["gold_annual_bill_fixed_and_variable_component_contributions_parquet"])
 
-    # ----------------------------------
-    # Gold dataset 1: Unit prices and standing charges by component
-    # ----------------------------------
-
-    results_gold_1 = gold_dr.execute(
-        [
-            "gold_tariff_component_rates_parquet",
-            "latest_price_cap_period",
-        ]
-    )
-
-    # generate dag image
-    dag_png = gold_dr.visualize_execution(
-        ["gold_tariff_component_rates_parquet"],
-        None,
-        render_kwargs={},
-    ).pipe(format="png")
-
-    # save dag image
-    storage.save_dag(
-        layer_prefix="gold",
-        dataset_prefix=ENERGY_PRICE_CAP_LEVELS_ANNEX_9["dataset_prefix"],
-        accompanying_filename="tariff_component_rates_standardised",
-        dag_image=dag_png,
-        date_stamp=f"period={utils.normalise_energy_price_cap_period_string(results_gold_1['latest_price_cap_period'])}",
-    )
-
-    # -------------------------------------------------------------
-    # Gold dataset 2: Total unit prices and price ratios
-    # -------------------------------------------------------------
-
-    results_gold_2 = gold_dr.execute(
-        [
-            "gold_unit_rates_with_ratios_parquet",
-            "latest_price_cap_period",
-        ]
-    )
-
-    # generate dag image
-    dag_png = gold_dr.visualize_execution(
-        ["gold_unit_rates_with_ratios_parquet"],
-        None,
-        render_kwargs={},
-    ).pipe(format="png")
-
-    # save dag image
-    storage.save_dag(
-        layer_prefix="gold",
-        dataset_prefix=ENERGY_PRICE_CAP_LEVELS_ANNEX_9["dataset_prefix"],
-        accompanying_filename="unit_rates_with_ratios",
-        dag_image=dag_png,
-        date_stamp=f"period={utils.normalise_energy_price_cap_period_string(results_gold_2['latest_price_cap_period'])}",
-    )
-
-    # -------------------------------------------------------------
-    # Gold dataset 3: Total standing charges
-    # -------------------------------------------------------------
-
-    results_gold_3 = gold_dr.execute(
-        [
-            "gold_standing_charges_parquet",
-            "latest_price_cap_period",
-        ]
-    )
-
-    # generate dag image
-    dag_png = gold_dr.visualize_execution(
-        ["gold_standing_charges_parquet"],
-        None,
-        render_kwargs={},
-    ).pipe(format="png")
-
-    # save dag image
-    storage.save_dag(
-        layer_prefix="gold",
-        dataset_prefix=ENERGY_PRICE_CAP_LEVELS_ANNEX_9["dataset_prefix"],
-        accompanying_filename="standing_charges",
-        dag_image=dag_png,
-        date_stamp=f"period={utils.normalise_energy_price_cap_period_string(results_gold_3['latest_price_cap_period'])}",
-    )
+    # TODO decide whether we need this if we want to save DAG images for gold
+    # latest_price_cap_period_str = gold_dr.execute("latest_price_cap_period")["latest_price_cap_period"]
 
 
 if __name__ == "__main__":

@@ -93,15 +93,18 @@ TBD.
 
 ## Gold
 
-### ETL code in GitHub repo
-
-| Variable | Defined where? | What is this? | Feeds into |
-|----------|----------------|---------------|------------|
-|`TODO`|----------------|---------------|------------|
-
 ### Gold file registry
 
-| Dataset   |    Fuel price by component           |
+| Dataset   | Nil and typical consumption components including VAT |
+|-----------|--------------------------------------|
+| Source silver dataset | 1c_consumption_adjusted_levels.parquet
+| Output Hamilton node  | `gold.gold_1c_consumption_adjusted_levels_with_vat_parquet()`
+| S3        | {S3 prefix}/`1c_consumption_adjusted_levels_with_vat`.parquet
+| DuckLake  | TBD
+| Superset  | TBD
+
+
+| Dataset   |    Unit prices and standing charges by component, standardised units           |
 |-----------|--------------------------------------|
 | Source silver dataset | 1c_consumption_adjusted_levels.parquet
 | Output Hamilton node  | `gold.gold_tariff_component_rates_parquet()`
@@ -109,18 +112,20 @@ TBD.
 | DuckLake  | TBD
 | Superset  | TBD
 
-| Dataset   |    Fuel price by component           |
+
+| Dataset   |    Total unit prices and price ratios           |
 |-----------|--------------------------------------|
 | Source silver dataset | 1c_consumption_adjusted_levels.parquet
-| Output Hamilton node  | `gold.gold_unit_rates_with_ratios_parquet()`
-| S3        | {S3 prefix}/`unit_rates_with_ratios`.parquet
+| Output Hamilton node  | `gold.gold_total_unit_rates_with_ratios_parquet()`
+| S3        | {S3 prefix}/`total_unit_rates_with_ratios`.parquet
 | DuckLake  | TBD
 | Superset  | TBD
 
-| Dataset   |    Fuel price by component           |
+
+| Dataset   |    Annual fuel bill breakdown by standing charge vs. consumption-based charge           |
 |-----------|--------------------------------------|
 | Source silver dataset | 1c_consumption_adjusted_levels.parquet
-| Output Hamilton node  | `gold.gold_standing_charges_parquet()`
-| S3        | {S3 prefix}/`standing_charges`.parquet
+| Output Hamilton node  | `gold.gold_annual_bill_fixed_and_variable_component_contributions_parquet()`
+| S3        | {S3 prefix}/`annual_bill_fixed_and_variable_component_contributions`.parquet
 | DuckLake  | TBD
 | Superset  | TBD
