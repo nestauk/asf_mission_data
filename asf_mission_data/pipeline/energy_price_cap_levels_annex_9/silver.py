@@ -479,7 +479,7 @@ def all_tariff_tables_tidy_df(
         gas_ppm_tidy_df,
         dual_fuel_ppm_tidy_df,
     ]
-    return pd.concat(all_dfs, ignore_index=True)
+    return pd.concat(all_dfs, ignore_index=True).drop_duplicates()
 
 
 @extract_columns(
