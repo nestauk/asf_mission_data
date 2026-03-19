@@ -69,7 +69,7 @@ def latest_price_cap_period(silver_df: pd.DataFrame) -> str:
 
 @check_output_custom(
     TariffComponentsTotalValidator(
-        fixed_col="value",
+        value_col="value",
         group_cols=["Consumption", "Fuel", "Payment method", "28AD Charge Restriction Period start"],
     )
 )
@@ -174,9 +174,8 @@ BENCHMARK_CONSUMPTION = {
 
 @check_output_custom(
     TariffComponentsTotalValidator(
-        fixed_col="Standing charge (p/day)",
-        variable_col="Unit price (p/kWh)",
-        group_cols=["Fuel", "Payment method", "28AD Charge Restriction Period start"],
+        value_col="value",
+        group_cols=["Fuel", "Payment method", "28AD Charge Restriction Period start", "Type"],
     )
 )
 def tariff_component_rates_df(consumption_adjusted_levels_with_vat_df: pd.DataFrame) -> pd.DataFrame:
@@ -206,6 +205,7 @@ def tariff_component_rates_df(consumption_adjusted_levels_with_vat_df: pd.DataFr
     dfs = []
     for fuel, benchmark in BENCHMARK_CONSUMPTION.items():
         fuel_df = consumption_adjusted_levels_with_vat_df[consumption_adjusted_levels_with_vat_df["Fuel"] == fuel].copy()
+
         if fuel_df.empty:
             continue
 
@@ -225,17 +225,43 @@ def tariff_component_rates_df(consumption_adjusted_levels_with_vat_df: pd.DataFr
         pivoted_df.columns.name = None
 
         result = pivoted_df.assign(
-            **{
-                "Standing charge (p/day)": pivoted_df["Nil consumption"] * 100 / 365,
-                "Unit price (p/kWh)": ((pivoted_df["Typical consumption"] - pivoted_df["Nil consumption"].fillna(0)) / benchmark) * 0.1,
-            }
+            standing_charge=pivoted_df["Nil consumption"] * 100 / 365,
+            unit_price=((pivoted_df["Typical consumption"] - pivoted_df["Nil consumption"].fillna(0)) / benchmark) * 0.1,
         ).drop(columns=["Nil consumption", "Typical consumption"])
 
-        result[["Standing charge (p/day)", "Unit price (p/kWh)"]] = result[["Standing charge (p/day)", "Unit price (p/kWh)"]].fillna(0)
+        result[["standing_charge", "unit_price"]] = result[["standing_charge", "unit_price"]].fillna(0)
+
+        result = result.melt(
+            id_vars=[
+                "Payment method",
+                "Fuel",
+                "Tariff component",
+                "28AD Charge Restriction Period",
+                "28AD Charge Restriction Period start",
+                "28AD Charge Restriction Period end",
+            ],
+            value_vars=["standing_charge", "unit_price"],
+            var_name="Type",
+            value_name="value",
+        )
+
+        result["Type"] = result["Type"].map(
+            {
+                "standing_charge": "Standing charge",
+                "unit_price": "Unit price",
+            }
+        )
+
+        result["Unit"] = result["Type"].map(
+            {
+                "Standing charge": "p/day",
+                "Unit price": "p/kWh",
+            }
+        )
 
         dfs.append(result)
 
-    return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
+    return pd.concat(dfs, ignore_index=True)
 
 
 @check_output(schema=GOLD_TARIFF_COMPONENT_RATES_SCHEMA, importance="fail")
@@ -313,6 +339,7 @@ def total_unit_rates_df(tariff_component_rates_df: pd.DataFrame) -> pd.DataFrame
     df_filtered = tariff_component_rates_df[
         (tariff_component_rates_df["Tariff component"] == "Total_GB average")
         & (tariff_component_rates_df["Fuel"].isin(["Gas", "Electricity: Single-Rate Metering Arrangement"]))
+        & (tariff_component_rates_df["Type"] == "Unit price")
     ].copy()
 
     unit_price_pivot = (
@@ -324,7 +351,7 @@ def total_unit_rates_df(tariff_component_rates_df: pd.DataFrame) -> pd.DataFrame
                 "28AD Charge Restriction Period end",
             ],
             columns="Fuel",
-            values="Unit price (p/kWh)",
+            values="value",
         )
         .rename(
             columns={
@@ -393,9 +420,8 @@ def gold_total_unit_rates_with_ratios_parquet(
 
 @check_output_custom(
     TariffComponentsTotalValidator(
-        fixed_col="Standing charge (GBP/year)",
-        variable_col="Consumption-based cost (GBP/year)",
-        group_cols=["Fuel", "Payment method", "28AD Charge Restriction Period start"],
+        value_col="value",
+        group_cols=["Fuel", "Payment method", "28AD Charge Restriction Period start", "Type"],
     )
 )
 def annual_bill_fixed_and_variable_contributions_df(consumption_adjusted_levels_with_vat_df: pd.DataFrame) -> pd.DataFrame:
@@ -424,8 +450,10 @@ def annual_bill_fixed_and_variable_contributions_df(consumption_adjusted_levels_
         for each fuel, payment method, and price cap period.
     """
     dfs = []
+
     for fuel in BENCHMARK_CONSUMPTION.keys():
         fuel_df = consumption_adjusted_levels_with_vat_df[consumption_adjusted_levels_with_vat_df["Fuel"] == fuel].copy()
+
         if fuel_df.empty:
             continue
 
@@ -441,15 +469,38 @@ def annual_bill_fixed_and_variable_contributions_df(consumption_adjusted_levels_
             columns="Consumption",
             values="value",
         ).reset_index()
+
         fuel_df.columns.name = None
 
-        fuel_df["Standing charge (GBP/year)"] = fuel_df["Nil consumption"].fillna(0)
-        fuel_df["Consumption-based cost (GBP/year)"] = fuel_df["Typical consumption"] - fuel_df["Standing charge (GBP/year)"]
+        fuel_df = fuel_df.assign(
+            standing_charge=fuel_df["Nil consumption"].fillna(0),
+            consumption_based_cost=(fuel_df["Typical consumption"] - fuel_df["Nil consumption"].fillna(0)),
+        ).drop(columns=["Nil consumption", "Typical consumption"])
 
-        fuel_df = fuel_df.drop(columns=["Nil consumption", "Typical consumption"])
-        fuel_df[["Standing charge (GBP/year)", "Consumption-based cost (GBP/year)"]] = fuel_df[
-            ["Standing charge (GBP/year)", "Consumption-based cost (GBP/year)"]
-        ].fillna(0)
+        fuel_df[["standing_charge", "consumption_based_cost"]] = fuel_df[["standing_charge", "consumption_based_cost"]].fillna(0)
+
+        fuel_df = fuel_df.melt(
+            id_vars=[
+                "Payment method",
+                "Fuel",
+                "Tariff component",
+                "28AD Charge Restriction Period",
+                "28AD Charge Restriction Period start",
+                "28AD Charge Restriction Period end",
+            ],
+            value_vars=["standing_charge", "consumption_based_cost"],
+            var_name="Type",
+            value_name="value",
+        )
+
+        fuel_df["Type"] = fuel_df["Type"].map(
+            {
+                "standing_charge": "Standing charge",
+                "consumption_based_cost": "Consumption-based cost",
+            }
+        )
+
+        fuel_df["Unit"] = "GBP/year"
 
         dfs.append(fuel_df)
 
