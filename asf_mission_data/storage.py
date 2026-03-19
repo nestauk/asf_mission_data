@@ -439,6 +439,18 @@ def locate_latest_silver(
 
 
 def read_parquet(parquet_uri: str) -> pd.DataFrame:
+    """Read a Parquet file from a given URI into a pandas DataFrame.
+
+    Args:
+        parquet_uri (str): URI or path to the Parquet file.
+
+    Raises:
+        e: Any exception encountered while opening or reading the Parquet file
+            is logged and re-raised.
+
+    Returns:
+        pd.DataFrame: DataFrame containing the data read from the Parquet file.
+    """
     try:
         with fsspec.open(parquet_uri, mode="rb") as f:
             df = pd.read_parquet(f)

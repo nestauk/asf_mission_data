@@ -19,6 +19,10 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
 )
 
+# -------------------------------------------------------------
+# Bronze
+# -------------------------------------------------------------
+
 
 # TODO refactor to be more generic and move to common module
 def build_bronze_driver() -> driver.Builder:
@@ -89,6 +93,11 @@ def run_bronze_pipeline():
     )
 
 
+# -------------------------------------------------------------
+# Silver
+# -------------------------------------------------------------
+
+
 # TODO refactor to be more generic and move to common module
 # TODO naming convention for different silver DAG drivers
 def build_silver_1c_consumption_adjusted_levels_driver() -> driver.Builder:
@@ -127,9 +136,7 @@ def run_silver_pipeline():
         silver datasets are processed.
     """
 
-    # ----------------------------------
-    # Silver dataset 1: Tariff tables
-    # ----------------------------------
+    # ----- Silver dataset: 1c consumption adjusted levels -----
 
     consumption_adjusted_levels_dr = build_silver_1c_consumption_adjusted_levels_driver()
     sheet_name = "1c Consumption adjusted levels"  # TODO refactor
@@ -157,9 +164,24 @@ def run_silver_pipeline():
     )
 
 
+# -------------------------------------------------------------
+# Gold
+# -------------------------------------------------------------
+
+
 # TODO refactor to be more generic and move to common module
-# TODO naming convention for different gold DAG drivers
-def build_gold_driver() -> driver.Builder:  # TODO this is for gold tables from 1c consumption adjusted levels sheet only
+# NOTE this is for gold tables from 1c consumption adjusted levels sheet only
+def build_gold_driver() -> driver.Builder:
+    """Construct a Hamilton driver for the gold layer of the Energy Price Cap
+        Annex 9 pipeline.
+
+    This driver is configured with the `gold` nodes module and the relevant
+    sheet name from the configuration to execute the ETL workflow for gold-layer
+    datasets.
+
+    Returns:
+        driver.Builder: Configured Hamilton driver ready to execute the gold ETL graph.
+    """
 
     dr = (
         driver.Builder()
@@ -173,6 +195,17 @@ def build_gold_driver() -> driver.Builder:  # TODO this is for gold tables from 
 
 
 def run_gold_pipeline():
+    """Execute the gold layer worflow for the Energy Price Cap Levels Annex 9 pipeline.
+
+    Gold datasets generated:
+        - Consumption-adjusted tariff levels including VAT as an explicit component
+        - Tariff component standing charges (p/day) and unit prices (p/kWh) for each fuel,
+            payment method and price cap period.
+        - Total unit prices (p/kWh) and price ratios for electricity (single-rate) and gas,
+            for each payment method and price cap period.
+        - Annual bill contriutions from standing charges and consumption-based costs for
+            each fuel, payment method and price cap period.
+    """
 
     gold_dr = build_gold_driver()
     gold_dr.execute(["gold_1c_consumption_adjusted_levels_with_vat_parquet"])
@@ -184,7 +217,11 @@ def run_gold_pipeline():
     # latest_price_cap_period_str = gold_dr.execute("latest_price_cap_period")["latest_price_cap_period"]
 
 
+# -------------------------------------------------------------
+# Pipeline execution entry point
+# -------------------------------------------------------------
+
 if __name__ == "__main__":
-    # run_bronze_pipeline()
-    # run_silver_pipeline()
+    run_bronze_pipeline()
+    run_silver_pipeline()
     run_gold_pipeline()
