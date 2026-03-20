@@ -196,12 +196,14 @@ class LatestPriceCapValidator(DataValidator):
         return ValidationResult(
             passes=valid,
             message=f"Expected publication date: {latest_publication_date.strftime(format='%d-%m-%Y')}, "
-            "saw publication date {publication_date.strftime(format='%d-%m-%Y')}",
+            f"saw publication date {publication_date.strftime(format='%d-%m-%Y')}",
         )
 
 
 @check_output_custom(LatestPriceCapValidator(PRICE_CAP_PERIOD_PUBLICATION_DATES))
-def latest_price_cap_period(latest_collection_page_html_soup: BeautifulSoup) -> str:
+def latest_price_cap_period(
+    latest_collection_page_html_soup: BeautifulSoup,
+) -> str:
     """Extract the latest energy price cap period from given collection page.
 
     Searches all <h2> and <h3> headings in the given BeautifulSoup object for

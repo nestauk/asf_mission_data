@@ -8,7 +8,10 @@ from importlib.metadata import version
 from hamilton import driver
 
 from asf_mission_data import storage, utils
-from asf_mission_data.pipeline.energy_price_cap_levels_annex_9 import bronze, silver
+from asf_mission_data.pipeline.energy_price_cap_levels_annex_9 import (
+    bronze,
+    silver,
+)
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import (
     ENERGY_PRICE_CAP_LEVELS_ANNEX_9,
 )
@@ -107,7 +110,12 @@ def build_silver_1c_consumption_adjusted_levels_driver() -> driver.Builder:
     dr = (
         driver.Builder()
         .with_modules(silver)
-        .with_config({"dataset_prefix": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["dataset_prefix"], "sheet_name": sheet_name})
+        .with_config(
+            {
+                "dataset_prefix": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["dataset_prefix"],
+                "sheet_name": sheet_name,
+            }
+        )
         .build()
     )
     return dr
