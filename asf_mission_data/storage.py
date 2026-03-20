@@ -9,6 +9,15 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+VALID_DATA_ROOTS = {
+    "LOCAL": None,
+    "DEV": "s3://asf-mission-data-dev",
+    "PROD": "s3://asf-mission-data-prod",
+}
+
+DEFAULT_DATA_MODE = "DEV"
+DEFAULT_HEARTBEAT_ROOT = "s3://asf-heartbeats-dev"
+
 
 def get_data_path(relative_path: str) -> str:
     """Get full path for data storage.
@@ -16,13 +25,13 @@ def get_data_path(relative_path: str) -> str:
     Set DATA_ROOT environment variable to control where data is stored:
     - Local dev: DATA_ROOT=/tmp/pipeline-dev
     - AWS dev: DATA_ROOT=s3://asf-mission-data-dev
-    - AWS prod: Leave unset (defaults to prod bucket)
+    - AWS prod: DATA_MODE=PROD and DATA_ROOT=s3://asf-mission-data-prod
 
     Example:
         >>> get_data_path("bronze/energy-cap/data.parquet")
         '/tmp/pipeline-dev/bronze/energy-cap/data.parquet'
     """
-    base = os.environ.get("DATA_ROOT", "s3://asf-mission-data-prod")
+    base = os.environ.get("DATA_ROOT", VALID_DATA_ROOTS[DEFAULT_DATA_MODE])
     return f"{base}/{relative_path}"
 
 
@@ -30,11 +39,11 @@ def get_heartbeat_path(pipeline_name: str) -> str:
     """Get path for pipeline heartbeat file.
 
     Uses HEARTBEAT_ROOT if set, otherwise falls back to DATA_ROOT,
-    otherwise defaults to the prod heartbeats bucket.
+    otherwise defaults to the dev heartbeats bucket.
     """
     base = os.environ.get(
         "HEARTBEAT_ROOT",
-        os.environ.get("DATA_ROOT", "s3://asf-heartbeats-prod"),
+        os.environ.get("DATA_ROOT", DEFAULT_HEARTBEAT_ROOT),
     )
     return f"{base}/heartbeats/{pipeline_name}.json"
 
@@ -63,25 +72,21 @@ def _initialise_environment():
             configuration for the selected mode.
     """
 
-    valid_modes = {
-        "LOCAL": "",
-        "DEV": "s3://asf-mission-data-dev",
-        "PROD": "s3://asf-mission-data-prod",
-        # "DEV-TEST": "s3://asf-mission-data-tool",
-    }
-
-    data_mode = os.getenv("DATA_MODE", "PROD")
-    data_root = os.getenv("DATA_ROOT")
-
-    if data_mode not in valid_modes:
+    data_mode = os.getenv("DATA_MODE", DEFAULT_DATA_MODE)
+    if data_mode not in VALID_DATA_ROOTS:
         raise ValueError(f"Invalid DATA_MODE: {data_mode}")
 
+    default_root = VALID_DATA_ROOTS[data_mode]
+    data_root = os.getenv("DATA_ROOT", default_root if default_root is not None else "")
+
     if data_mode in ("DEV", "PROD"):
-        if data_root != valid_modes[data_mode]:
-            raise ValueError(f"Mismatch: {data_mode} requires {valid_modes[data_mode]}")
+        if data_root != VALID_DATA_ROOTS[data_mode]:
+            raise ValueError(f"Mismatch: {data_mode} requires {VALID_DATA_ROOTS[data_mode]}")
 
     elif data_mode == "LOCAL":
-        if data_root in (valid_modes["DEV"], valid_modes["PROD"]):
+        if not data_root:
+            raise ValueError("LOCAL requires DATA_ROOT to be set to a local directory.")
+        if data_root.startswith("s3://"):
             raise ValueError(f"Local mode cannot point to cloud storage {data_root}.")
 
     return data_mode, data_root
@@ -193,7 +198,7 @@ def ingest_to_bronze(
             Defaults to "bronze".
     """
 
-    data_mode, data_root = _initialise_environment()
+    _, data_root = _initialise_environment()
 
     base_path = f"{data_root}/data/{layer_prefix}/{dataset_prefix}"
     historical_file = f"{base_path}/historical/{date_stamp}/file/{filename}"
@@ -239,7 +244,7 @@ def save_dag(
         date_stamp (str): Canonical timestamp or partition identifier for historical storage.
     """
 
-    data_mode, data_root = _initialise_environment()
+    _, data_root = _initialise_environment()
 
     base_path = f"{data_root}/artifacts/dags/{layer_prefix}/{dataset_prefix}"
     historical_file = f"{base_path}/{date_stamp}/{accompanying_filename}.dag.png"
