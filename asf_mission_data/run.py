@@ -72,7 +72,7 @@ def main() -> int:
     parser = build_parser()
     args, extra_args = parser.parse_known_args()
 
-    logger.info("Pipeline: {args.pipeline} | Stage: {args.stage}")
+    logger.info(f"Pipeline: {args.pipeline} | Stage: {args.stage}")
 
     module_path = f"asf_mission_data.pipeline.{args.pipeline}.pipeline"
     logger.debug(f"Importing pipeline module: {module_path}")
