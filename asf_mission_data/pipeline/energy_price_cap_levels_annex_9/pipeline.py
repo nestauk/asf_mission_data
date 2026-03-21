@@ -165,6 +165,13 @@ def run_silver_pipeline():
     )
 
 
-if __name__ == "__main__":
-    run_bronze_pipeline()
-    run_silver_pipeline()
+def run(stage: str = "all", extra_args: list | None = None) -> None:
+    if stage in ("bronze", "all"):
+        logger.info("Starting bronze stage")
+        run_bronze_pipeline()
+        logger.info("Completed bronze stage")
+
+    # if stage in ("silver", "all"):
+    #     logger.info("Starting silver stage")
+    #     run_silver_pipeline()
+    #     logger.info("Completed silver stage")
