@@ -1,10 +1,13 @@
 """Hamilton nodes for silver-layer of the Energy Price Cap Levels Annex 9 pipeline"""
 
 import logging
+from typing import Type
 
 import pandas as pd
+from hamilton.data_quality.base import DataValidator, ValidationResult
 from hamilton.function_modifiers import (
     check_output,
+    check_output_custom,
     extract_columns,
     parameterize,
     source,
@@ -12,6 +15,7 @@ from hamilton.function_modifiers import (
 )
 
 from asf_mission_data import storage, utils
+from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import PRICE_CAP_PERIOD_PUBLICATION_DATES
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.schemas import (
     SILVER_1C_CONSUMPTION_ADJUSTED_LEVELS_SCHEMA,
 )
@@ -61,6 +65,59 @@ def bronze_energy_price_cap_annex_9_metadata(dataset_prefix: str) -> dict:
     return storage.read_json(metadata_uri)
 
 
+# TODO move to a more appropriate module later
+class PriceCapValidator(DataValidator):
+    """Checks that the price cap period extracted is valid."""
+
+    def __init__(
+        self,
+        price_cap_period_publication_dates: dict[str, str],
+        importance: str = "fail",
+    ):
+        super(PriceCapValidator, self).__init__(importance=importance)
+        self.price_cap_period_publication_dates = price_cap_period_publication_dates
+        self.expected_period_intervals = {
+            utils.convert_energy_price_cap_period_string_to_interval(k) for k in price_cap_period_publication_dates.keys()
+        }
+
+    def applies_to(self, datatype: Type) -> bool:
+        """Whether or not this data validator can apply to
+        the specified dataset
+
+         :param datatype:
+         :return: True if it can be run on the specified type.
+        """
+        return datatype is str
+
+    def description(self) -> str:
+        """Gives a description of this validator.
+        :return: The description of the validator as a string
+        """
+        return "Checks that the price cap period extracted is valid"
+
+    @classmethod
+    def name(cls) -> str:
+        """Returns the name for this validator."""
+        return "PriceCapValidator"
+
+    def validate(self, data: str) -> ValidationResult:
+        """Actually performs the validation.
+
+        :param data: data to validate
+        :return: The result of validation
+        """
+        extracted_period_interval = utils.convert_energy_price_cap_period_string_to_interval(data)
+
+        if extracted_period_interval not in self.expected_period_intervals:
+            valid_values = ", ".join(self.price_cap_period_publication_dates.keys())
+            return ValidationResult(
+                passes=False,
+                message=f"Unrecognised price cap period: '{data}'. Expected one of: {valid_values}",
+            )
+        return ValidationResult(passes=True, message="Valid price cap period")
+
+
+@check_output_custom(PriceCapValidator(PRICE_CAP_PERIOD_PUBLICATION_DATES))
 def latest_price_cap_period(
     bronze_energy_price_cap_annex_9_metadata: dict[str, str],
 ) -> str:
