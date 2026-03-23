@@ -197,7 +197,7 @@ def _get_payment_method_table_range(excel_sheet_df: pd.DataFrame, payment_method
     start_index = header_matches[0]
 
     # Only dual fuel tables have Total inc VAT row
-    dual_fuel_cols = [col for col in excel_sheet_df.columns if excel_sheet_df[col].astype(str).str.contains("Dual fuel", regex=False).any()]
+    dual_fuel_cols = excel_sheet_df.columns[(excel_sheet_df == "Dual fuel (implied)").any(axis=0)].to_list()
 
     if not dual_fuel_cols:
         raise KeyError("Could not find a column containing 'Dual fuel'.")
@@ -209,9 +209,11 @@ def _get_payment_method_table_range(excel_sheet_df: pd.DataFrame, payment_method
         (excel_sheet_df[dual_fuel_header_column] == "Total inc VAT") & (excel_sheet_df.index > start_index)
     ].tolist()
 
+    # Expect that there are at least 2 Total inc VAT occurences after each payment method header
+    # One in the Nil Consumption table and one in the Typical Consumption table
     if len(possible_table_end_indices) < 2:
         raise IndexError(
-            f"Expected at least 2 'Total inc VAT' rows after {payment_method} at index {start_index}, "
+            f"Expected at least 2 'Total inc VAT' rows after {payment_method} at index {start_index},"
             f"but found only {len(possible_table_end_indices)}."
         )
 
@@ -239,7 +241,7 @@ def raw_payment_method_table_df(excel_sheet_df: pd.DataFrame, payment_method: st
     """
     start_index, end_index = _get_payment_method_table_range(excel_sheet_df, payment_method)
 
-    df_slice = excel_sheet_df.iloc[start_index : end_index + 1, :].copy()
+    df_slice = excel_sheet_df.loc[start_index:end_index, :].copy()
 
     # Check slice is expected payment method section
     header = str(df_slice.iloc[0, 1]).strip()
@@ -252,12 +254,34 @@ def raw_payment_method_table_df(excel_sheet_df: pd.DataFrame, payment_method: st
 
 
 @parameterize(
-    forward_filled_columns_other_payment_method_table_df={"raw_payment_method_table_df": source("raw_other_payment_method_table_df")},
-    forward_filled_columns_standard_credit_table_df={"raw_payment_method_table_df": source("raw_standard_credit_table_df")},
-    forward_filled_columns_ppm_table_df={"raw_payment_method_table_df": source("raw_ppm_table_df")},
+    cleaned_other_payment_method_table_df={"raw_payment_method_table_df": source("raw_other_payment_method_table_df")},
+    cleaned_standard_credit_table_df={"raw_payment_method_table_df": source("raw_standard_credit_table_df")},
+    cleaned_ppm_table_df={"raw_payment_method_table_df": source("raw_ppm_table_df")},
+)
+def cleaned_payment_method_table_df(
+    raw_payment_method_table_df: pd.DataFrame,
+) -> pd.DataFrame:
+    """Remove empty rows and columns from a payment method tariff table.
+
+    Args:
+        raw_payment_method_table_df (pd.DataFrame): Raw extracted payment method table.
+
+    Returns:
+        pd.DataFrame: Cleaned DataFrame with empty rows and columns removed.
+    """
+
+    df_cleaned = raw_payment_method_table_df.dropna(axis="index", how="all").dropna(axis="columns", how="all").reset_index(drop=True)
+
+    return df_cleaned
+
+
+@parameterize(
+    forward_filled_columns_other_payment_method_table_df={"cleaned_payment_method_table_df": source("cleaned_other_payment_method_table_df")},
+    forward_filled_columns_standard_credit_table_df={"cleaned_payment_method_table_df": source("cleaned_standard_credit_table_df")},
+    forward_filled_columns_ppm_table_df={"cleaned_payment_method_table_df": source("cleaned_ppm_table_df")},
 )
 def forward_filled_columns_payment_method_table_df(
-    raw_payment_method_table_df: pd.DataFrame,
+    cleaned_payment_method_table_df: pd.DataFrame,
 ) -> pd.DataFrame:
     """Forward-fill column headers across the payment method table.
 
@@ -265,65 +289,33 @@ def forward_filled_columns_payment_method_table_df(
     fills those values horizontally to produce consistent column labels.
 
     Args:
-        raw_payment_method_table_df (pd.DataFrame): Raw extracted payment method table.
+        cleaned_payment_method_table_df (pd.DataFrame): Silver table with empty rows and columns dropped.
 
     Returns:
         pd.DataFrame: DataFrame with column values forward-filled.
     """
 
-    df_filled = raw_payment_method_table_df.ffill(axis="columns").infer_objects()
+    df_filled = cleaned_payment_method_table_df.ffill(axis="columns").infer_objects()
 
     return df_filled
 
 
-@parameterize(
-    cleaned_other_payment_method_table_df={
-        "forward_filled_columns_payment_method_table_df": source("forward_filled_columns_other_payment_method_table_df")
-    },
-    cleaned_standard_credit_table_df={
-        "forward_filled_columns_payment_method_table_df": source("forward_filled_columns_standard_credit_table_df")
-    },
-    cleaned_ppm_table_df={"forward_filled_columns_payment_method_table_df": source("forward_filled_columns_ppm_table_df")},
-)
-def cleaned_payment_method_table_df(
-    forward_filled_columns_payment_method_table_df: pd.DataFrame,
-) -> pd.DataFrame:
-    """Remove empty rows and columns from a payment method tariff table.
-
-    Args:
-        forward_filled_columns_payment_method_table_df (pd.DataFrame): Forward-filled table.
-
-    Returns:
-        pd.DataFrame: Cleaned DataFrame with empty rows and columns removed.
-    """
-
-    cleaned_df = (
-        forward_filled_columns_payment_method_table_df.dropna(axis="index", how="all").dropna(axis="columns", how="all").reset_index(drop=True)
-    )
-
-    return cleaned_df
-
-
-def _get_fuel_columns(cleaned_payment_method_table_df: pd.DataFrame, fuel: str) -> list[str]:
+def _get_fuel_columns(forward_filled_columns_payment_method_table_df: pd.DataFrame, fuel: str) -> list[str]:
     """Identify columns associated with a specific fuel type.
 
     Args:
-        cleaned_payment_method_table_df (pd.DataFrame): Cleaned tariff table.
+        forward_filled_columns_payment_method_table_df (pd.DataFrame): Cleaned and forward-filled table.
         fuel (str): Fuel label (e.g. gas).
 
     Returns:
         list[str]: List of column names corresponding to the specified fuel type.
     """
-    return [
-        col
-        for col in cleaned_payment_method_table_df.columns
-        if cleaned_payment_method_table_df[col].astype(str).str.contains(fuel, na=False, regex=False).any()
-    ]
+    return forward_filled_columns_payment_method_table_df.columns[(forward_filled_columns_payment_method_table_df == fuel).any(axis=0)].to_list()
 
 
 NIL_DF_MAP = {
     _construct_node_name(fuel, payment, "nil_consumption_df"): {
-        "cleaned_payment_method_table_df": source(f"cleaned_{payment}_table_df"),
+        "forward_filled_columns_payment_method_table_df": source(f"forward_filled_columns_{payment}_table_df"),
         "payment_method": value(payment),
         "fuel": value(FUEL_TYPE_LOOKUP[fuel]),
     }
@@ -334,14 +326,15 @@ NIL_DF_MAP = {
 
 @parameterize(**NIL_DF_MAP)
 def fuel_nil_consumption_df(
-    cleaned_payment_method_table_df: pd.DataFrame,
+    forward_filled_columns_payment_method_table_df: pd.DataFrame,
     payment_method: str,
     fuel: str,
 ) -> pd.DataFrame:
     """Extract the 'Nil consumption' tariff table for a fuel and payment method.
 
     Args:
-        cleaned_payment_method_table_df (pd.DataFrame): Cleaned payment method tariff table.
+        forward_filled_columns_payment_method_table_df (pd.DataFrame): Cleaned and
+            forward-filled payment method tariff table.
         payment_method (str): Payment method identifier.
         fuel (str): Fuel type label.
 
@@ -349,18 +342,18 @@ def fuel_nil_consumption_df(
         pd.DataFrame: DataFrame containing nil consumption tariff components.
     """
 
-    fuel_columns = _get_fuel_columns(cleaned_payment_method_table_df, fuel)
+    fuel_columns = _get_fuel_columns(forward_filled_columns_payment_method_table_df, fuel)
 
-    start_nil_consumption_index = cleaned_payment_method_table_df.index[
-        cleaned_payment_method_table_df[fuel_columns[0]] == "Nil consumption"
+    start_nil_consumption_index = forward_filled_columns_payment_method_table_df.index[
+        forward_filled_columns_payment_method_table_df[fuel_columns[0]] == "Nil consumption"
     ].tolist()[0]
-    start_typical_consumption_index = cleaned_payment_method_table_df.index[
-        cleaned_payment_method_table_df[fuel_columns[0]] == "Typical consumption"
+    start_typical_consumption_index = forward_filled_columns_payment_method_table_df.index[
+        forward_filled_columns_payment_method_table_df[fuel_columns[0]] == "Typical consumption"
     ].tolist()[0]
 
     fuel_nil_df = (
-        cleaned_payment_method_table_df[fuel_columns]
-        .iloc[
+        forward_filled_columns_payment_method_table_df[fuel_columns]
+        .loc[
             start_nil_consumption_index : start_typical_consumption_index - 1,
             :,
         ]
@@ -377,7 +370,7 @@ def fuel_nil_consumption_df(
 
 TYPICAL_DF_MAP = {
     _construct_node_name(fuel, payment, "typical_consumption_df"): {
-        "cleaned_payment_method_table_df": source(f"cleaned_{payment}_table_df"),
+        "forward_filled_columns_payment_method_table_df": source(f"forward_filled_columns_{payment}_table_df"),
         "payment_method": value(payment),
         "fuel": value(FUEL_TYPE_LOOKUP[fuel]),
     }
@@ -388,14 +381,15 @@ TYPICAL_DF_MAP = {
 
 @parameterize(**TYPICAL_DF_MAP)
 def fuel_typical_consumption_df(
-    cleaned_payment_method_table_df: pd.DataFrame,
+    forward_filled_columns_payment_method_table_df: pd.DataFrame,
     payment_method: str,
     fuel: str,
 ) -> pd.DataFrame:
     """Extract the 'Typical consumption' tariff table for a fuel and payment method.
 
     Args:
-        cleaned_payment_method_table_df (pd.DataFrame): Cleaned payment method tariff table.
+        forward_filled_columns_payment_method_table_df (pd.DataFrame): Cleaned and
+            forward-filled payment method tariff table.
         payment_method (str): Payment method identifier.
         fuel (str): Fuel type label.
 
@@ -403,13 +397,15 @@ def fuel_typical_consumption_df(
         pd.DataFrame: DataFrame containing typical consumption tariff components.
     """
 
-    fuel_columns = _get_fuel_columns(cleaned_payment_method_table_df, fuel)
+    fuel_columns = _get_fuel_columns(forward_filled_columns_payment_method_table_df, fuel)
 
-    start_typical_consumption_index = cleaned_payment_method_table_df.index[
-        cleaned_payment_method_table_df[fuel_columns[0]] == "Typical consumption"
+    start_typical_consumption_index = forward_filled_columns_payment_method_table_df.index[
+        forward_filled_columns_payment_method_table_df[fuel_columns[0]] == "Typical consumption"
     ].tolist()[0]
 
-    fuel_typical_df = cleaned_payment_method_table_df[fuel_columns].iloc[start_typical_consumption_index:, :].reset_index(drop=True)
+    fuel_typical_df = (
+        forward_filled_columns_payment_method_table_df[fuel_columns].loc[start_typical_consumption_index:, :].reset_index(drop=True)
+    )
     fuel_typical_df.columns = fuel_typical_df.iloc[0]
     fuel_typical_df = fuel_typical_df.iloc[1:]
     fuel_typical_df = fuel_typical_df.rename(columns={"Typical consumption": "Tariff component"})
@@ -536,7 +532,7 @@ def all_tariff_tables_tidy_df(
         gas_ppm_tidy_df,
         dual_fuel_ppm_tidy_df,
     ]
-    return pd.concat(all_dfs, ignore_index=True).drop_duplicates()
+    return pd.concat(all_dfs, ignore_index=True)
 
 
 @extract_columns(
