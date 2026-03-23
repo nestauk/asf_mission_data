@@ -44,3 +44,9 @@ PRICE_CAP_PERIOD_PUBLICATION_DATES = {
     "1 July to 30 September 2030": "2030-05-29",
     "1 October to 31 December 2030": "2030-08-28",
 }
+
+BENCHMARK_CONSUMPTION = {  # MWh per year
+    "Gas": 11.5,
+    "Electricity: Single-Rate Metering Arrangement": 2.7,
+    "Electricity: Multi-Register Metering Arrangement": 3.9,
+}

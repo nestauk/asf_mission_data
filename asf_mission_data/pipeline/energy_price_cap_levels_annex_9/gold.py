@@ -9,6 +9,7 @@ from hamilton.function_modifiers import (
 )
 
 from asf_mission_data import storage, utils
+from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import BENCHMARK_CONSUMPTION
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.schemas import (
     GOLD_1C_CONSUMPTION_ADJUSTED_LEVELS_WITH_VAT_SCHEMA,
     GOLD_ANNUAL_BILL_FIXED_AND_VARIABLE_COMPONENT_CONTRIBUTIONS_SCHEMA,
@@ -91,12 +92,12 @@ def consumption_adjusted_levels_with_vat_df(silver_df: pd.DataFrame) -> pd.DataF
         VAT as a separate component, and updated `Total_GB average` values
         that include VAT.
     """
-    VAT = 0.05  # TODO move to config
+    vat = 0.05
 
     # Add VAT as individual tariff component
     vat_rows = silver_df[silver_df["Tariff component"] == "Total_GB average"].copy()
     vat_rows["Tariff component"] = "VAT"
-    vat_rows["value"] *= VAT
+    vat_rows["value"] *= vat
 
     # Uprate Total_GB average to include VAT
     uprated_silver_df = silver_df.copy()
@@ -104,7 +105,7 @@ def consumption_adjusted_levels_with_vat_df(silver_df: pd.DataFrame) -> pd.DataF
     uprated_silver_df.loc[
         (uprated_silver_df["Tariff component"] == "Total_GB average"),
         "value",
-    ] *= 1 + VAT
+    ] *= 1 + vat
 
     # Remove now redundant "Total inc VAT" rows for Dual fuel
     uprated_silver_df = uprated_silver_df[uprated_silver_df["Tariff component"] != "Total inc VAT"]
@@ -164,13 +165,6 @@ def gold_1c_consumption_adjusted_levels_with_vat_parquet(
 # Gold dataset: Unit prices and standing charges by component, standardised units
 # -------------------------------------------------------------
 
-# TODO move to config MWh per year
-BENCHMARK_CONSUMPTION = {
-    "Gas": 11.5,
-    "Electricity: Single-Rate Metering Arrangement": 2.7,
-    "Electricity: Multi-Register Metering Arrangement": 3.9,
-}
-
 
 @check_output_custom(
     TariffComponentsTotalValidator(
@@ -179,87 +173,75 @@ BENCHMARK_CONSUMPTION = {
     )
 )
 def tariff_component_rates_df(consumption_adjusted_levels_with_vat_df: pd.DataFrame) -> pd.DataFrame:
-    """Derive standing charges and unit rates for each tariff component.
+    """Calculate standing charges and unit rates for tariff components.
 
-    This function converts annual tariff component values into standardised
-    standing charges (p/day) and unit prices (p/kWh). It does this by pivoting
-    the VAT-adjusted dataset to separate "Nil consumption" and "Typical consumption"
-    values, then calculating:
-    - Standing charge: derived from the nil-consumption annual value.
-    - Unit price: derived from the difference between typical and nil consumption
-      values divided by benchmark annual consumption for the fuel type.
+    The input dataset contains VAT-adjusted annual tariff component values for
+    two consumption levels: "Nil consumption" and "Typical consumption". For
+    each fuel, the data is pivoted to separate these values and used to derive:
 
-    The calculation is performed separately for each fuel type using predefined
-    benchmark consumption values.
+    - Standing charge (p/day): from the nil consumption annual value.
+    - Unit price (p/kWh): from the difference between typical and nil
+      consumption values divided by the benchmark annual consumption for the
+      fuel.
+
+    Benchmark consumption values are taken from ``BENCHMARK_CONSUMPTION``.
 
     Args:
-        consumption_adjusted_levels_with_vat_df (pd.DataFrame): DataFrame containing the original
-        tariff components, VAT as a separate component, and updated `Total_GB average` values
-        that include VAT.
+        consumption_adjusted_levels_with_vat_df (pd.DataFrame): DataFrame
+            containing tariff component values with VAT applied.
 
     Returns:
-        pd.DataFrame: DataFrame containing tariff components with calculated
-        standing charges (p/day) and unit prices (p/kWh) for each fuel,
-        payment method, and price cap period.
+        pd.DataFrame: Long-format DataFrame containing standing charges and
+        unit prices by fuel, payment method, tariff component, and price cap
+        period, with columns ``Type``, ``Unit``, and ``value``.
     """
+    index_cols = [
+        "Payment method",
+        "Fuel",
+        "Tariff component",
+        "28AD Charge Restriction Period",
+        "28AD Charge Restriction Period start",
+        "28AD Charge Restriction Period end",
+    ]
+
     dfs = []
+
     for fuel, benchmark in BENCHMARK_CONSUMPTION.items():
-        fuel_df = consumption_adjusted_levels_with_vat_df[consumption_adjusted_levels_with_vat_df["Fuel"] == fuel].copy()
+        fuel_df = consumption_adjusted_levels_with_vat_df.loc[consumption_adjusted_levels_with_vat_df["Fuel"] == fuel]
 
         if fuel_df.empty:
             continue
 
-        pivoted_df = fuel_df.pivot_table(
-            index=[
-                "Payment method",
-                "Fuel",
-                "Tariff component",
-                "28AD Charge Restriction Period",
-                "28AD Charge Restriction Period start",
-                "28AD Charge Restriction Period end",
-            ],
-            columns="Consumption",
-            values="value",
-        ).reset_index()
-
-        pivoted_df.columns.name = None
-
-        result = pivoted_df.assign(
-            standing_charge=pivoted_df["Nil consumption"] * 100 / 365,
-            unit_price=((pivoted_df["Typical consumption"] - pivoted_df["Nil consumption"].fillna(0)) / benchmark) * 0.1,
-        ).drop(columns=["Nil consumption", "Typical consumption"])
-
-        result[["standing_charge", "unit_price"]] = result[["standing_charge", "unit_price"]].fillna(0)
-
-        result = result.melt(
-            id_vars=[
-                "Payment method",
-                "Fuel",
-                "Tariff component",
-                "28AD Charge Restriction Period",
-                "28AD Charge Restriction Period start",
-                "28AD Charge Restriction Period end",
-            ],
-            value_vars=["standing_charge", "unit_price"],
-            var_name="Type",
-            value_name="value",
+        pivoted = (
+            fuel_df.pivot_table(
+                index=index_cols,
+                columns="Consumption",
+                values="value",
+            )
+            .rename_axis(None, axis=1)
+            .reset_index()
         )
 
-        result["Type"] = result["Type"].map(
-            {
-                "standing_charge": "Standing charge",
-                "unit_price": "Unit price",
-            }
+        melted = (
+            pivoted.assign(
+                standing_charge=pivoted["Nil consumption"] * 100 / 365,
+                unit_price=((pivoted["Typical consumption"] - pivoted["Nil consumption"].fillna(0)) / benchmark) * 0.1,
+            )
+            .drop(columns=["Nil consumption", "Typical consumption"])
+            .fillna({"standing_charge": 0, "unit_price": 0})
+            .melt(
+                id_vars=index_cols,
+                value_vars=["standing_charge", "unit_price"],
+                var_name="Type",
+                value_name="value",
+            )
         )
 
-        result["Unit"] = result["Type"].map(
-            {
-                "Standing charge": "p/day",
-                "Unit price": "p/kWh",
-            }
-        )
+        melted["Type"] = melted["Type"].replace({"standing_charge": "Standing charge", "unit_price": "Unit price"})
 
-        dfs.append(result)
+        melted["Unit"] = melted["Type"].map({"Standing charge": "p/day", "Unit price": "p/kWh"})
+
+        dfs.append(melted)
 
     return pd.concat(dfs, ignore_index=True)
 
@@ -425,84 +407,79 @@ def gold_total_unit_rates_with_ratios_parquet(
     )
 )
 def annual_bill_fixed_and_variable_contributions_df(consumption_adjusted_levels_with_vat_df: pd.DataFrame) -> pd.DataFrame:
-    """Calculate annual bill contributions from standing charges and consumption-based costs.
+    """Derive annual fixed and variable bill contributions for tariff components.
 
-    This function derives the fixed and variable components of the annual
-    energy bill for each tariff component. It pivots the VAT-adjusted dataset
-    to separate "Nil consumption" and "Typical consumption" values and then
-    calculates:
-    - Standing charge (GBP/year): taken from the nil-consumption annual value,
-      representing the fixed portion of the bill.
-    - Consumption-based cost (GBP/year): calculated as the difference between
-      the typical-consumption value and the standing charge, representing the
-      variable portion of the bill.
+    The input dataset contains VAT-adjusted annual tariff component values for
+    two consumption levels: "Nil consumption" and "Typical consumption". For
+    each fuel, the data is pivoted to separate these values and used to derive:
 
-    The calculation is performed separately for each fuel type defined in the
-    benchmark consumption configuration.
+    - Standing charge (GBP/year): the nil consumption annual value.
+    - Consumption-based cost (GBP/year): the difference between typical and
+      nil consumption values.
 
     Args:
         consumption_adjusted_levels_with_vat_df (pd.DataFrame): DataFrame
-            containing tariff components with VAT applied.
+            containing tariff component values with VAT applied for nil and
+            typical consumption levels.
 
     Returns:
-        pd.DataFrame: DataFrame containing tariff components with annual
-        standing charge contributions and consumption-based cost contributions
-        for each fuel, payment method, and price cap period.
+        pd.DataFrame: Long DataFrame containing annual standing charge
+        and consumption-based cost contributions by fuel, payment method,
+        tariff component, and price cap period, with columns ``Type``,
+        ``Unit`` ("GBP/year"), and ``value``.
     """
+    index_cols = [
+        "Payment method",
+        "Fuel",
+        "Tariff component",
+        "28AD Charge Restriction Period",
+        "28AD Charge Restriction Period start",
+        "28AD Charge Restriction Period end",
+    ]
+
     dfs = []
 
     for fuel in BENCHMARK_CONSUMPTION.keys():
-        fuel_df = consumption_adjusted_levels_with_vat_df[consumption_adjusted_levels_with_vat_df["Fuel"] == fuel].copy()
+        fuel_df = consumption_adjusted_levels_with_vat_df.loc[consumption_adjusted_levels_with_vat_df["Fuel"] == fuel]
 
         if fuel_df.empty:
             continue
 
-        fuel_df = fuel_df.pivot_table(
-            index=[
-                "Payment method",
-                "Fuel",
-                "Tariff component",
-                "28AD Charge Restriction Period",
-                "28AD Charge Restriction Period start",
-                "28AD Charge Restriction Period end",
-            ],
-            columns="Consumption",
-            values="value",
-        ).reset_index()
-
-        fuel_df.columns.name = None
-
-        fuel_df = fuel_df.assign(
-            standing_charge=fuel_df["Nil consumption"].fillna(0),
-            consumption_based_cost=(fuel_df["Typical consumption"] - fuel_df["Nil consumption"].fillna(0)),
-        ).drop(columns=["Nil consumption", "Typical consumption"])
-
-        fuel_df[["standing_charge", "consumption_based_cost"]] = fuel_df[["standing_charge", "consumption_based_cost"]].fillna(0)
-
-        fuel_df = fuel_df.melt(
-            id_vars=[
-                "Payment method",
-                "Fuel",
-                "Tariff component",
-                "28AD Charge Restriction Period",
-                "28AD Charge Restriction Period start",
-                "28AD Charge Restriction Period end",
-            ],
-            value_vars=["standing_charge", "consumption_based_cost"],
-            var_name="Type",
-            value_name="value",
+        pivoted = (
+            fuel_df.pivot_table(
+                index=index_cols,
+                columns="Consumption",
+                values="value",
+            )
+            .rename_axis(None, axis=1)
+            .reset_index()
         )
 
-        fuel_df["Type"] = fuel_df["Type"].map(
+        melted = (
+            pivoted.assign(
+                standing_charge=pivoted["Nil consumption"].fillna(0),
+                consumption_based_cost=(pivoted["Typical consumption"] - pivoted["Nil consumption"].fillna(0)),
+            )
+            .drop(columns=["Nil consumption", "Typical consumption"])
+            .fillna({"standing_charge": 0, "consumption_based_cost": 0})
+            .melt(
+                id_vars=index_cols,
+                value_vars=["standing_charge", "consumption_based_cost"],
+                var_name="Type",
+                value_name="value",
+            )
+        )
+
+        melted["Type"] = melted["Type"].replace(
             {
                 "standing_charge": "Standing charge",
                 "consumption_based_cost": "Consumption-based cost",
             }
         )
 
-        fuel_df["Unit"] = "GBP/year"
+        melted["Unit"] = "GBP/year"
 
-        dfs.append(fuel_df)
+        dfs.append(melted)
 
     return pd.concat(dfs, ignore_index=True)
 
