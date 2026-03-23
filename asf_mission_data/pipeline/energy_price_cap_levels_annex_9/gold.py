@@ -13,8 +13,8 @@ from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import BEN
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.schemas import (
     GOLD_1C_CONSUMPTION_ADJUSTED_LEVELS_WITH_VAT_SCHEMA,
     GOLD_ANNUAL_BILL_FIXED_AND_VARIABLE_COMPONENT_CONTRIBUTIONS_SCHEMA,
+    GOLD_PRICE_RATIOS_SCHEMA,
     GOLD_TARIFF_COMPONENT_RATES_SCHEMA,
-    GOLD_TOTAL_UNIT_RATES_WITH_RATIOS_SCHEMA,
 )
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.validators import TariffComponentsTotalValidator
 
@@ -318,14 +318,14 @@ def total_unit_rates_df(tariff_component_rates_df: pd.DataFrame) -> pd.DataFrame
         electricity in separate columns for each payment method and
         price cap period.
     """
-    df_filtered = tariff_component_rates_df[
+    totals_df = tariff_component_rates_df[
         (tariff_component_rates_df["Tariff component"] == "Total_GB average")
         & (tariff_component_rates_df["Fuel"].isin(["Gas", "Electricity: Single-Rate Metering Arrangement"]))
         & (tariff_component_rates_df["Type"] == "Unit price")
     ].copy()
 
-    unit_price_pivot = (
-        df_filtered.pivot_table(
+    pivoted = (
+        totals_df.pivot_table(
             index=[
                 "Payment method",
                 "28AD Charge Restriction Period",
@@ -337,60 +337,70 @@ def total_unit_rates_df(tariff_component_rates_df: pd.DataFrame) -> pd.DataFrame
         )
         .rename(
             columns={
-                "Electricity: Single-Rate Metering Arrangement": "Electricity (single rate) unit price (p/kWh)",
-                "Gas": "Gas unit price (p/kWh)",
+                "Electricity: Single-Rate Metering Arrangement": "Electricity (single rate) unit price",
+                "Gas": "Gas unit price",
             }
         )
         .reset_index()
     )
 
-    return unit_price_pivot
+    return pivoted
 
 
-@check_output(schema=GOLD_TOTAL_UNIT_RATES_WITH_RATIOS_SCHEMA, importance="fail")
-def gold_total_unit_rates_with_ratios_df(total_unit_rates_df: pd.DataFrame, silver_df: pd.DataFrame) -> pd.DataFrame:
-    """Create the gold dataset of total unit rates and electricity-to-gas price ratios.
+@check_output(schema=GOLD_PRICE_RATIOS_SCHEMA, importance="fail")
+def gold_price_ratios_df(total_unit_rates_df: pd.DataFrame, silver_df: pd.DataFrame) -> pd.DataFrame:
+    """Create the gold dataset of electricity-to-gas unit price ratios.
 
-    This function takes the pivoted unit rate dataset for gas and single-rate
-    electricity, calculates the ratio of electricity unit prices to gas unit
-    prices, and attaches the metadata from the silver dataset to each row.
+    Computes the ratio of electricity unit price to gas unit price for each
+    payment method and price cap period. Metadata from the silver dataset
+    is propagated to all rows.
 
     Args:
-        total_unit_rates_df (pd.DataFrame): DataFrame with unit prices for gas and single-rate
-            electricity in separate columns for each payment method and price cap period.
-        silver_df (pd.DataFrame): silver_df (pd.DataFrame): Original silver-layer dataframe containing metadata
-        in a `metadata` column, to be propagated to the gold dataset.
+        total_unit_rates_df (pd.DataFrame): Electricity and gas unit prices by
+            payment method and price cap period.
+        silver_df (pd.DataFrame): Silver-layer dataframe containing a `metadata`
+            column to attach to the output.
 
     Returns:
-        pd.DataFrame: Gold-layer DataFrame containing gas and electricity unit prices, the
-        calculated electricity-to-gas price ratio, and associated metadata.
+        pd.DataFrame: Dataset containing electricity-to-gas price ratios and
+        associated metadata.
     """
-    df = total_unit_rates_df.copy()
-    df["Electricity to gas price ratio"] = df["Electricity (single rate) unit price (p/kWh)"] / df["Gas unit price (p/kWh)"]
+    pivoted = total_unit_rates_df.copy()
+
+    pivoted["value"] = pivoted["Electricity (single rate) unit price"] / pivoted["Gas unit price"]
+
+    id_cols = [
+        "Payment method",
+        "28AD Charge Restriction Period",
+        "28AD Charge Restriction Period start",
+        "28AD Charge Restriction Period end",
+    ]
+
+    df = pivoted[id_cols + ["value"]].copy()
+
+    df["Variable"] = "Electricity to gas price ratio"
     df["metadata"] = [silver_df["metadata"][0]] * len(df)
+
     return df.reset_index(drop=True)
 
 
-def gold_total_unit_rates_with_ratios_parquet(
-    gold_total_unit_rates_with_ratios_df: pd.DataFrame, dataset_prefix: str, latest_price_cap_period: str
-) -> None:
-    """Persist the gold-layer dataset for gas and electricity unit prices, electricity-to-gas price ratios
-    as a parquet file.
+def gold_price_ratios_parquet(gold_price_ratios_df: pd.DataFrame, dataset_prefix: str, latest_price_cap_period: str) -> None:
+    """Persist the gold-layer dataset for electricity-to-gas price ratios as a parquet file.
 
     This function ingests the prepared gold DataFrame into the gold storage
     layer as a parquet dataset. The dataset is stored under `/latest` and a
     `/historical` period-based partition derived from the latest price cap period.
 
     Args:
-        gold_total_unit_rates_with_ratios_df (pd.DataFrame): Gold-layer DataFrame containing gas and electricity unit prices,
-            the calculated electricity-to-gas price ratio, and associated metadata.
+        gold_price_ratios_df (pd.DataFrame): Gold-layer DataFrame containing
+            calculated electricity-to-gas price ratios and associated metadata.
         dataset_prefix (str): Dataset identifier used to namespace storage.
         latest_price_cap_period (str): Period used to timestamp the dataset.
     """
     storage.ingest_to_gold(
         dataset_prefix=dataset_prefix,
-        df=gold_total_unit_rates_with_ratios_df,
-        df_name="total_unit_rates_with_ratios",
+        df=gold_price_ratios_df,
+        df_name="price_ratios",
         date_stamp=f"period={utils.normalise_energy_price_cap_period_string(latest_price_cap_period)}",
     )
 

@@ -113,11 +113,11 @@ TBD.
 | Superset  | TBD
 
 
-| Dataset   |    Total unit prices and price ratios           |
+| Dataset   |    Electricity-to-gas price ratios           |
 |-----------|--------------------------------------|
 | Source silver dataset | 1c_consumption_adjusted_levels.parquet
-| Output Hamilton node  | `gold.gold_total_unit_rates_with_ratios_parquet()`
-| S3        | {S3 prefix}/`total_unit_rates_with_ratios`.parquet
+| Output Hamilton node  | `gold.gold_price_ratios_parquet()`
+| S3        | {S3 prefix}/`price_ratios`.parquet
 | DuckLake  | TBD
 | Superset  | TBD
 

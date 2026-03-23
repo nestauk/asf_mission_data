@@ -125,15 +125,14 @@ GOLD_TARIFF_COMPONENT_RATES_SCHEMA = pa.DataFrameSchema(
     strict=True,
 )
 
-GOLD_TOTAL_UNIT_RATES_WITH_RATIOS_SCHEMA = pa.DataFrameSchema(
+GOLD_PRICE_RATIOS_SCHEMA = pa.DataFrameSchema(
     {
         "Payment method": Column(str, Check.isin(["Other Payment Method", "Standard Credit", "PPM"])),
         "28AD Charge Restriction Period": Column(str),
         "28AD Charge Restriction Period start": Column(pd.Timestamp),
         "28AD Charge Restriction Period end": Column(pd.Timestamp),
-        "Electricity (single rate) unit price (p/kWh)": Column(float),
-        "Gas unit price (p/kWh)": Column(float),
-        "Electricity to gas price ratio": Column(float),
+        "Variable": Column(str, Check.isin(["Electricity to gas price ratio"])),
+        "value": Column(float),
         "metadata": Column(object),
     },
     strict=True,

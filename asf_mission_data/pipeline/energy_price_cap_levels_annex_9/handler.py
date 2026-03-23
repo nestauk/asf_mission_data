@@ -201,7 +201,7 @@ def run_gold_pipeline():
         - Consumption-adjusted tariff levels including VAT as an explicit component
         - Tariff component standing charges (p/day) and unit prices (p/kWh) for each fuel,
             payment method and price cap period.
-        - Total unit prices (p/kWh) and price ratios for electricity (single-rate) and gas,
+        - Price ratios for electricity (single-rate) and gas,
             for each payment method and price cap period.
         - Annual bill contriutions from standing charges and consumption-based costs for
             each fuel, payment method and price cap period.
@@ -210,7 +210,7 @@ def run_gold_pipeline():
     gold_dr = build_gold_driver()
     gold_dr.execute(["gold_1c_consumption_adjusted_levels_with_vat_parquet"])
     gold_dr.execute(["gold_tariff_component_rates_parquet"])
-    gold_dr.execute(["gold_total_unit_rates_with_ratios_parquet"])
+    gold_dr.execute(["gold_price_ratios_parquet"])
     gold_dr.execute(["gold_annual_bill_fixed_and_variable_component_contributions_parquet"])
 
     # TODO decide whether we need this if we want to save DAG images for gold
@@ -222,6 +222,6 @@ def run_gold_pipeline():
 # -------------------------------------------------------------
 
 if __name__ == "__main__":
-    run_bronze_pipeline()
-    run_silver_pipeline()
+    # run_bronze_pipeline()
+    # run_silver_pipeline()
     run_gold_pipeline()
