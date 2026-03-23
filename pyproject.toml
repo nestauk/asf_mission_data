@@ -17,8 +17,9 @@ dependencies = [
     "s3fs>=2024.2.0",
     "requests>=2.31.0",
     "pyyaml>=6.0.0",
+    "beautifulsoup4>=4.14.3",
     "sf-hamilton>=1.89.0",
-    "boto3>=1.42.42",
+    "boto3>=1.42.49",
 ]
 
 [project.urls]
@@ -48,7 +49,7 @@ dev = [
 packages = ["asf_mission_data"]
 
 [tool.ruff]
-line-length = 100
+line-length = 145
 target-version = "py312"
 
 [tool.ruff.lint]
