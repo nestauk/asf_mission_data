@@ -37,12 +37,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
-  #     - name: Configure AWS credentials
-  #       uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
-  #       with:
-  #         role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/asf-github-actions-dev
-  #         aws-region: ${{ env.AWS_REGION }}
-  #         role-session-name: GitHubActions-BuildPush-${{ github.run_id }}
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/asf-github-actions-dev
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-BuildPush-${{ github.run_id }}
 
   #     - name: Log in to ECR
   #       id: ecr-login
