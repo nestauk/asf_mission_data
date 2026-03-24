@@ -296,7 +296,7 @@ def gold_tariff_component_rates_parquet(gold_tariff_component_rates_df: pd.DataF
 
 
 # -------------------------------------------------------------
-# Gold dataset: Total unit prices and price ratios
+# Gold dataset: Electricity to gas price ratios
 # -------------------------------------------------------------
 
 
