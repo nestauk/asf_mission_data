@@ -1,0 +1,10 @@
+  name: Build and push to ECR
+                                                                                                                                                                                                           
+  on:                                                                                                                                                                                                    
+    workflow_dispatch:
+
+  jobs:
+    placeholder:
+      runs-on: ubuntu-latest
+      steps:
+        - run: echo "Placeholder — real workflow is on feature branch"
