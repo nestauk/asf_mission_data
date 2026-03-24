@@ -1,7 +1,15 @@
 name: Build and push Docker Image to ECR
 
+# Script environment variables
+env:
+  ECR_REPO: asf-mission-data
+  AWS_REGION: eu-west-2
+
+# Triggers
 on:
+  # Trigger the action manually from the UI
   workflow_dispatch:
+  # Trigger the action when pushed to dev branch
   push:
     branches: [dev]
 
@@ -17,21 +25,17 @@ jobs:
           uv sync --group dev
           uv run pytest
 
-  # build-and-push:
-  #   needs: test
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 15
-  #   permissions:
-  #     id-token: write
-  #     contents: read
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      id-token: write
+      contents: read
 
-  #   env:
-  #     ECR_REPO: asf-mission-data
-  #     AWS_REGION: eu-west-2
-
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
 
   #     - name: Configure AWS credentials
   #       uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
