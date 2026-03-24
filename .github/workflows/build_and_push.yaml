@@ -51,21 +51,18 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-  #     - name: Build and push image
-  #       uses: docker/build-push-action@v6
-  #       with:
-  #         context: .
-  #         push: true
-  #         platforms: linux/amd64
-  #         tags: |
-  #           ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPO }}:${{ github.sha }}
-  #           ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPO }}:latest
-  #         cache-from: type=gha
-  #         cache-to: type=gha,mode=max
-  #         provenance: false
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          tags: ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPO }}:dev-latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
 
-  #     - name: Summary
-  #       run: |
-  #         echo "### Image pushed to ECR" >> $GITHUB_STEP_SUMMARY
-  #         echo "- \`${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPO }}:${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
-  #         echo "- \`${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPO }}:latest\`" >> $GITHUB_STEP_SUMMARY
+      - name: Summary
+        run: |
+          echo "### Image pushed to ECR" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPO }}:dev-latest\`" >> $GITHUB_STEP_SUMMARY
