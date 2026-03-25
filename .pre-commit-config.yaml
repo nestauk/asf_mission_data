@@ -55,6 +55,7 @@ repos:
         args: ['--markdown-linebreak-ext=md']
     -   id: check-yaml # validates YAML syntax
         name: "✨ misc-files · Validate YAML files"
+        args: ["--unsafe"]
         exclude: "docs/mkdocs.yml"
 # ------------------------------- 🌳 Git Tools ------------------------------- #
     -   id: check-added-large-files
