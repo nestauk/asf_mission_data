@@ -11,8 +11,6 @@ is_local = not os.environ.get("DATA_ROOT", "").startswith("s3://")
 log_level = "DEBUG" if is_local else "INFO"
 logger = setup_logging(__name__, log_level=log_level)
 
-logger = setup_logging(__name__, log_level="DEBUG")
-
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run an ASF Mission Data pipeline.")
