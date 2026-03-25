@@ -36,8 +36,6 @@ def run_bronze_pipeline():
         },
     )
 
-    logger.info("Bronze stage complete")
-
 
 def build_silver_driver() -> driver.Driver:
     """Construct a Hamilton driver for the silver layer."""
@@ -61,8 +59,6 @@ def run_silver_pipeline():
         "silver_bank_holidays_parquet",
     ]
     dr.execute(node_targets)
-
-    logger.info("Silver stage complete")
 
 
 def run(stage: str = "bronze", extra_args: list | None = None) -> None:
