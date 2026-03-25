@@ -28,6 +28,28 @@ def bronze_bank_holidays_json(bronze_bank_holidays_uri: str) -> dict:
     return storage.read_json(bronze_bank_holidays_uri)
 
 
+def bronze_bank_holidays_metadata(dataset_prefix: str) -> dict:
+    """Load metadata for the latest bronze bank holidays ingest."""
+    uri = storage.locate_latest_bronze(dataset_prefix, "metadata")
+    logger.info("Located bronze metadata: %s", uri)
+    return storage.read_json(uri)
+
+
+def silver_bank_holidays_date_stamp(
+    bronze_bank_holidays_metadata: dict,
+) -> str:
+    """Build a stable historical silver partition from the bronze ingest timestamp."""
+    ingested_at = bronze_bank_holidays_metadata.get("ingested_at")
+    if not ingested_at:
+        raise ValueError("Expected 'ingested_at' in bronze metadata for silver historical storage.")
+
+    ingested_at_dt = pd.to_datetime(ingested_at, utc=True)
+    if pd.isna(ingested_at_dt):
+        raise ValueError(f"Could not parse bronze ingest timestamp: {ingested_at}")
+
+    return f"ingested={ingested_at_dt.strftime('%Y-%m-%dT%H-%M-%SZ')}"
+
+
 def flattened_bank_holidays_df(
     bronze_bank_holidays_json: dict,
 ) -> pd.DataFrame:
@@ -85,13 +107,14 @@ def validated_bank_holidays_df(
 def silver_bank_holidays_parquet(
     validated_bank_holidays_df: pd.DataFrame,
     dataset_prefix: str,
+    silver_bank_holidays_date_stamp: str,
 ) -> pd.DataFrame:
     """Persist the validated DataFrame to the silver layer as parquet."""
     storage.ingest_to_silver(
         dataset_prefix=dataset_prefix,
         df=validated_bank_holidays_df,
         df_name="bank_holidays",
-        date_stamp="latest",
+        date_stamp=silver_bank_holidays_date_stamp,
     )
     logger.info("Silver stage persisted %d rows", len(validated_bank_holidays_df))
     return validated_bank_holidays_df
