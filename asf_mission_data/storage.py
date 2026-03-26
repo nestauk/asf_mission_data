@@ -313,7 +313,7 @@ def read_excel_sheet(excel_uri: str, sheet_name: str) -> pd.DataFrame:
         pd.DataFrame: DataFrame containing the sheet data.
     """
     try:
-        df = pd.read_excel(excel_uri, sheet_name, engine="openpyxl")
+        df = pd.read_excel(excel_uri, sheet_name, engine="calamine")
         logger.info(f"Successfully loaded '{sheet_name}' from {excel_uri} as a dataframe.")
         return df
     except Exception as e:
