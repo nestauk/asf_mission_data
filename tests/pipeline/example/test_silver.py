@@ -1,8 +1,11 @@
+import json
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import pandera.errors
 import pytest
+from hamilton.data_quality.base import DataValidationError
 
 from asf_mission_data import storage
 from asf_mission_data.pipeline.example import pipeline, silver
@@ -12,7 +15,7 @@ from asf_mission_data.pipeline.example.schemas import (
 
 
 def test_flattened_bank_holidays_df_creates_one_row_per_event(
-    sample_bank_holidays_json: dict,
+    sample_bank_holidays_json: dict[str, Any],
 ) -> None:
     df = silver.flattened_bank_holidays_df(sample_bank_holidays_json)
 
@@ -28,7 +31,7 @@ def test_flattened_bank_holidays_df_creates_one_row_per_event(
 
 
 def test_parsed_bank_holidays_df_parses_dates_and_adds_year(
-    sample_bank_holidays_json: dict,
+    sample_bank_holidays_json: dict[str, Any],
 ) -> None:
     flattened_df = silver.flattened_bank_holidays_df(sample_bank_holidays_json)
 
@@ -66,13 +69,36 @@ def test_silver_schema_rejects_invalid_division() -> None:
         SILVER_BANK_HOLIDAYS_SCHEMA.validate(invalid_df)
 
 
+def test_hamilton_validation_fails_closed_for_invalid_silver_data() -> None:
+    invalid_df = pd.DataFrame(
+        [
+            {
+                "division": "wales-only",
+                "title": "Invented Holiday",
+                "date": pd.Timestamp("2025-01-01"),
+                "notes": "",
+                "bunting": True,
+                "year": 2025,
+            }
+        ]
+    )
+
+    driver = pipeline.build_silver_driver()
+
+    with pytest.raises(DataValidationError):
+        driver.execute(
+            ["validated_bank_holidays_df"],
+            overrides={"parsed_bank_holidays_df": invalid_df},
+        )
+
+
 def test_run_silver_pipeline_reads_latest_bronze_and_writes_parquet(
     local_data_root: str,
-    sample_bank_holidays_json: dict,
+    sample_bank_holidays_json: dict[str, Any],
 ) -> None:
     storage.ingest_to_bronze(
         dataset_prefix="example",
-        file=sample_bank_holidays_json,
+        file=json.dumps(sample_bank_holidays_json),
         filename="bank-holidays.json",
         date_stamp="ingested=2025-06-01 09:30:00",
         metadata={

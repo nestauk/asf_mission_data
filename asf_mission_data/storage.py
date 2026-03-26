@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+from typing import Any, cast
 
 import fsspec
 import pandas as pd
@@ -48,7 +49,7 @@ def get_heartbeat_path(pipeline_name: str) -> str:
     return f"{base}/heartbeats/{pipeline_name}.json"
 
 
-def _initialise_environment():
+def _initialise_environment() -> tuple[str, str]:
     """Validate and load storage configuration from environment variables.
 
     Reads from:
@@ -92,7 +93,7 @@ def _initialise_environment():
     return data_mode, data_root
 
 
-def persist(uri: str, content: bytes | dict) -> None:
+def persist(uri: str, content: bytes | str | dict[str, Any]) -> None:
     """Persist content to a local or cloud storage location.
     Supports URI schemes like local file paths or S3 URIs.
 
@@ -105,14 +106,17 @@ def persist(uri: str, content: bytes | dict) -> None:
 
     Args:
         uri (str): Target storage location.
-        content (bytes | dict): Data to persist. Dictionaries are serialised to JSON.
-            Bytes are written directly.
+        content (bytes | str | dict[str, Any]): Data to persist. Dictionaries are
+            serialised to JSON. Bytes are written directly.
     """
 
+    serialised_content: bytes | str
     if isinstance(content, dict):
-        content = json.dumps(content, indent=2)
+        serialised_content = json.dumps(content, indent=2)
+    else:
+        serialised_content = content
 
-    mode = "wb" if isinstance(content, bytes) else "w"
+    mode = "wb" if isinstance(serialised_content, bytes) else "w"
 
     fs, path = fsspec.core.url_to_fs(uri)
 
@@ -121,7 +125,7 @@ def persist(uri: str, content: bytes | dict) -> None:
         fs.mkdirs(parent, exist_ok=True)
 
     with fs.open(path, mode) as f:
-        f.write(content)
+        f.write(serialised_content)
 
     logger.info("Saved: %s", uri)
 
@@ -165,7 +169,7 @@ def ingest_to_bronze(
     file: bytes | str,
     filename: str,
     date_stamp: str,
-    metadata: dict,
+    metadata: dict[str, Any],
     layer_prefix: str = "bronze",
 ) -> None:
     """Persists raw dataset files and associated metadata to the bronze storage layer.
@@ -255,7 +259,7 @@ def locate_latest_bronze(
     dataset_prefix: str,
     file_or_metadata: str = "file",
     layer_prefix: str = "bronze",
-) -> str:
+) -> str | None:
     """Locate the latest bronze dataset file or metadata for a given pipeline.
 
     Args:
@@ -269,7 +273,7 @@ def locate_latest_bronze(
         ValueError: If `file_or_metadata` is not 'file' or 'metadata'.
 
     Returns:
-        str: URI of the latest bronze file or metadata, or None if not found.
+        str | None: URI of the latest bronze file or metadata, or None if not found.
     """
 
     if file_or_metadata not in ["file", "metadata"]:
@@ -283,7 +287,7 @@ def locate_latest_bronze(
 
     if not fs.exists(path):
         logger.info("Prefix does not exist: %s", uri_prefix)
-        return
+        return None
 
     files = fs.glob(path + "/*")
 
@@ -291,7 +295,7 @@ def locate_latest_bronze(
 
     if not files:
         logger.info("No files found under prefix: %s", uri_prefix)
-        return
+        return None
 
     logger.info(
         "Found %d item(s) under prefix: %s",
@@ -299,7 +303,7 @@ def locate_latest_bronze(
         uri_prefix,
     )
 
-    return fs.unstrip_protocol(files[0])
+    return cast(str, fs.unstrip_protocol(files[0]))
 
 
 def read_excel_sheet(excel_uri: str, sheet_name: str) -> pd.DataFrame:
@@ -318,17 +322,17 @@ def read_excel_sheet(excel_uri: str, sheet_name: str) -> pd.DataFrame:
         return df
     except Exception as e:
         logger.error(f"Failed to load tab '{sheet_name}' from Excel file '{excel_uri}' as dataframe: {e}")
-        raise e
+        raise
 
 
-def read_json(json_uri: str) -> any:
+def read_json(json_uri: str) -> Any:
     """Read a JSON file from local or remote storage.
 
     Args:
         json_uri (str): URI or path to the JSON file.
 
     Returns:
-        any: Parsed JSON content.
+        Any: Parsed JSON content.
     """
 
     try:

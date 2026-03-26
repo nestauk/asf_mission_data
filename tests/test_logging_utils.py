@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 import pytest
 
@@ -24,7 +25,7 @@ def test_setup_logging_resets_existing_handlers() -> None:
     assert isinstance(configured_logger.handlers[0], logging.StreamHandler)
 
 
-def test_setup_logging_adds_optional_file_handler(tmp_path) -> None:
+def test_setup_logging_adds_optional_file_handler(tmp_path: Path) -> None:
     log_file = tmp_path / "pipeline.log"
     logger = setup_logging("tests.logging.file", log_filename=str(log_file))
 

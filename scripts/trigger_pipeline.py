@@ -7,6 +7,7 @@ Usage:
 
 import argparse
 import sys
+from typing import Any
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
@@ -30,8 +31,8 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def run_task(pipeline, stage) -> None:
-    params: dict = {
+def run_task(pipeline: str, stage: str) -> None:
+    params: dict[str, Any] = {
         "cluster": CLUSTER,
         "taskDefinition": TASK_FAMILY,
         "count": 1,

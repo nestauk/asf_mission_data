@@ -19,7 +19,7 @@ logger = setup_logging(__name__)
 DATASET_PREFIX = "example"
 
 
-def run_bronze_pipeline():
+def run_bronze_pipeline() -> None:
     raw_data = fetch_raw_data()
 
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
@@ -52,7 +52,7 @@ def build_silver_driver() -> driver.Driver:
     return dr
 
 
-def run_silver_pipeline():
+def run_silver_pipeline() -> None:
     dr = build_silver_driver()
 
     node_targets = [
@@ -61,7 +61,7 @@ def run_silver_pipeline():
     dr.execute(node_targets)
 
 
-def run(stage: str = "bronze", extra_args: list | None = None) -> None:
+def run(stage: str = "bronze", extra_args: list[str] | None = None) -> None:
     if stage in ("bronze", "all"):
         logger.info("Starting bronze stage")
         run_bronze_pipeline()

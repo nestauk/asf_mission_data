@@ -6,12 +6,14 @@ sample data and common setup that test modules can use without importing.
 """
 
 import json
+from pathlib import Path
+from typing import Any
 
 import pytest
 
 
 @pytest.fixture
-def sample_bank_holidays_json() -> dict:
+def sample_bank_holidays_json() -> dict[str, Any]:
     return {
         "england-and-wales": {
             "division": "england-and-wales",
@@ -45,12 +47,12 @@ def sample_bank_holidays_json() -> dict:
 
 
 @pytest.fixture
-def sample_bank_holidays_bytes(sample_bank_holidays_json: dict) -> bytes:
+def sample_bank_holidays_bytes(sample_bank_holidays_json: dict[str, Any]) -> bytes:
     return json.dumps(sample_bank_holidays_json).encode("utf-8")
 
 
 @pytest.fixture
-def local_data_root(tmp_path, monkeypatch: pytest.MonkeyPatch) -> str:
+def local_data_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
     monkeypatch.setenv("DATA_MODE", "LOCAL")
     monkeypatch.setenv("DATA_ROOT", str(tmp_path))
     return str(tmp_path)

@@ -7,6 +7,7 @@ for internet access and S3 writes.
 """
 
 import urllib.request
+from typing import cast
 
 from asf_mission_data.logging_utils import setup_logging
 
@@ -19,6 +20,6 @@ def fetch_raw_data() -> bytes:
     """Download bank holidays JSON from gov.uk."""
     logger.info("Fetching data from %s", SOURCE_URL)
     with urllib.request.urlopen(SOURCE_URL) as response:
-        data = response.read()
+        data = cast(bytes, response.read())
     logger.info("Downloaded %d bytes", len(data))
     return data

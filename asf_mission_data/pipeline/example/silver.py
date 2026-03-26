@@ -4,6 +4,8 @@ The example pipeline transforms raw bank holidays JSON
 into a DataFrame, validates it, and persists as parquet
 """
 
+from typing import Any, cast
+
 import pandas as pd
 from hamilton.function_modifiers import check_output
 
@@ -19,24 +21,28 @@ logger = setup_logging(__name__)
 def bronze_bank_holidays_uri(dataset_prefix: str) -> str:
     """Locate the latest bronze bank holidays JSON file."""
     uri = storage.locate_latest_bronze(dataset_prefix, "file")
+    if uri is None:
+        raise FileNotFoundError(f"No latest bronze file found for dataset prefix '{dataset_prefix}'.")
     logger.info("Located bronze file: %s", uri)
     return uri
 
 
-def bronze_bank_holidays_json(bronze_bank_holidays_uri: str) -> dict:
+def bronze_bank_holidays_json(bronze_bank_holidays_uri: str) -> dict[str, Any]:
     """Load the raw bank holidays JSON from bronze storage."""
-    return storage.read_json(bronze_bank_holidays_uri)
+    return cast(dict[str, Any], storage.read_json(bronze_bank_holidays_uri))
 
 
-def bronze_bank_holidays_metadata(dataset_prefix: str) -> dict:
+def bronze_bank_holidays_metadata(dataset_prefix: str) -> dict[str, Any]:
     """Load metadata for the latest bronze bank holidays ingest."""
     uri = storage.locate_latest_bronze(dataset_prefix, "metadata")
+    if uri is None:
+        raise FileNotFoundError(f"No latest bronze metadata found for dataset prefix '{dataset_prefix}'.")
     logger.info("Located bronze metadata: %s", uri)
-    return storage.read_json(uri)
+    return cast(dict[str, Any], storage.read_json(uri))
 
 
 def silver_bank_holidays_date_stamp(
-    bronze_bank_holidays_metadata: dict,
+    bronze_bank_holidays_metadata: dict[str, Any],
 ) -> str:
     """Build a stable historical silver partition from the bronze ingest timestamp."""
     ingested_at = bronze_bank_holidays_metadata.get("ingested_at")
@@ -51,7 +57,7 @@ def silver_bank_holidays_date_stamp(
 
 
 def flattened_bank_holidays_df(
-    bronze_bank_holidays_json: dict,
+    bronze_bank_holidays_json: dict[str, Any],
 ) -> pd.DataFrame:
     """Flatten nested JSON into one row per holiday per division.
 
@@ -91,7 +97,7 @@ def parsed_bank_holidays_df(
     return df
 
 
-@check_output(schema=SILVER_BANK_HOLIDAYS_SCHEMA)
+@check_output(schema=SILVER_BANK_HOLIDAYS_SCHEMA, importance="fail")
 def validated_bank_holidays_df(
     parsed_bank_holidays_df: pd.DataFrame,
 ) -> pd.DataFrame:

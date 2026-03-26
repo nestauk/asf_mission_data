@@ -1,5 +1,9 @@
 import json
 from pathlib import Path
+from types import TracebackType
+from typing import Any
+
+import pytest
 
 from asf_mission_data.pipeline.example import bronze, pipeline
 
@@ -14,12 +18,17 @@ class _FakeResponse:
     def __enter__(self) -> "_FakeResponse":
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None:
         return None
 
 
 def test_fetch_raw_data_downloads_bytes(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
     sample_bank_holidays_bytes: bytes,
 ) -> None:
     def fake_urlopen(url: str) -> _FakeResponse:
@@ -32,7 +41,7 @@ def test_fetch_raw_data_downloads_bytes(
 
 
 def test_run_bronze_pipeline_persists_latest_file_and_metadata(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
     local_data_root: str,
     sample_bank_holidays_bytes: bytes,
 ) -> None:
@@ -45,7 +54,7 @@ def test_run_bronze_pipeline_persists_latest_file_and_metadata(
 
     assert latest_file.read_bytes() == sample_bank_holidays_bytes
 
-    metadata = json.loads(latest_metadata.read_text())
+    metadata: dict[str, Any] = json.loads(latest_metadata.read_text())
     assert metadata["source_url"] == bronze.SOURCE_URL
     assert metadata["size_bytes"] == len(sample_bank_holidays_bytes)
     assert metadata["ingested_at"]
