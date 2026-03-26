@@ -9,7 +9,7 @@ from hamilton.function_modifiers import (
 )
 
 from asf_mission_data import storage, utils
-from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import BENCHMARK_CONSUMPTION
+from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import BENCHMARK_CONSUMPTION, COMPONENT_CATEGORY_MAP
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.schemas import (
     GOLD_1C_CONSUMPTION_ADJUSTED_LEVELS_WITH_VAT_SCHEMA,
     GOLD_ANNUAL_BILL_FIXED_AND_VARIABLE_COMPONENT_CONTRIBUTIONS_SCHEMA,
@@ -131,9 +131,14 @@ def gold_1c_consumption_adjusted_levels_with_vat_df(
 
     Returns:
         pd.DataFrame: Gold-layer DataFrame containing consumption-adjusted
-        tariff levels with VAT and associated metadata.
+        tariff levels with VAT, component categories and associated metadata.
     """
     df = consumption_adjusted_levels_with_vat_df.copy()
+
+    # Add component category column
+    df["Component category"] = df["Tariff component"].map(COMPONENT_CATEGORY_MAP)
+
+    # Add metadata
     df["metadata"] = [silver_df["metadata"][0]] * len(df)
     return df
 
@@ -259,16 +264,21 @@ def gold_tariff_component_rates_df(
 
     Args:
         silver_df (pd.DataFrame): Original silver-layer dataframe containing metadata
-        in a `metadata` column, to be propagated to the gold dataset.
+            in a `metadata` column, to be propagated to the gold dataset.
         tariff_component_rates_df (pd.DataFrame): Processed DataFrame containing tariff
-        components with calculated standing charges (p/day) and unit prices (p/kWh) for each fuel,
-        payment method, and price cap period.
+            components with calculated standing charges (p/day) and unit prices (p/kWh) for each fuel,
+            payment method, and price cap period.
 
     Returns:
         pd.DataFrame: Gold-layer DataFrame containing standing charge and unit rates for
-    each component and associated metadata.
+            each component and component category, and associated metadata.
     """
     df = tariff_component_rates_df.copy()
+
+    # Add component category column
+    df["Component category"] = df["Tariff component"].map(COMPONENT_CATEGORY_MAP)
+
+    # Add metadata
     df["metadata"] = [silver_df["metadata"][0]] * len(df)
     return df
 
@@ -513,9 +523,14 @@ def gold_annual_bill_fixed_and_variable_component_contributions_df(
 
     Returns:
         pd.DataFrame: Gold-layer DataFrame containing annual bill fixed and
-            variable component contributions along with associated metadata.
+            variable component and component category contributions along with associated metadata.
     """
     df = annual_bill_fixed_and_variable_contributions_df.copy()
+
+    # Add component category column
+    df["Component category"] = df["Tariff component"].map(COMPONENT_CATEGORY_MAP)
+
+    # Add metadata
     df["metadata"] = [silver_df["metadata"][0]] * len(df)
     return df
 

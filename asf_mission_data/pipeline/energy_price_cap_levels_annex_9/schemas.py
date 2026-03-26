@@ -73,6 +73,10 @@ GOLD_1C_CONSUMPTION_ADJUSTED_LEVELS_WITH_VAT_SCHEMA = pa.DataFrameSchema(
                 ]
             ),
         ),
+        "Component category": Column(
+            str,
+            Check.isin("Wholesale", "Policy", "Network", "Operating", "Other", "VAT", "Total_GB average"),
+        ),
         "28AD Charge Restriction Period": Column(str),
         "value": Column(float, nullable=True),
         "28AD Charge Restriction Period start": Column(pd.Timestamp),
@@ -113,6 +117,10 @@ GOLD_TARIFF_COMPONENT_RATES_SCHEMA = pa.DataFrameSchema(
                     "VAT",
                 ]
             ),
+        ),
+        "Component category": Column(
+            str,
+            Check.isin("Wholesale", "Policy", "Network", "Operating", "Other", "VAT", "Total_GB average"),
         ),
         "28AD Charge Restriction Period": Column(str),
         "28AD Charge Restriction Period start": Column(pd.Timestamp),
@@ -168,6 +176,7 @@ GOLD_ANNUAL_BILL_FIXED_AND_VARIABLE_COMPONENT_CONTRIBUTIONS_SCHEMA = pa.DataFram
                 ]
             ),
         ),
+        "Component category": Column(str, Check.isin("Wholesale", "Policy", "Network", "Operating", "Other", "VAT", "Total_GB average")),
         "28AD Charge Restriction Period": Column(str),
         "28AD Charge Restriction Period start": Column(pd.Timestamp),
         "28AD Charge Restriction Period end": Column(pd.Timestamp),
