@@ -213,6 +213,7 @@ class CoreStack(Stack):
                         "iam:PassedToService": [
                             "lambda.amazonaws.com",
                             "scheduler.amazonaws.com",
+                            "ecs-tasks.amazonaws.com",
                         ]
                     }
                 },
@@ -235,6 +236,18 @@ class CoreStack(Stack):
                 ],
                 resources=[
                     f"arn:aws:scheduler:{config.aws_region}:{config.aws_account_id}:schedule/default/{config.project_prefix}-*"
+                ],
+            )
+        )
+        # -----------------------------------------------------------------
+        # ECS Permissions (for triggering pipeline tasks)
+        # -----------------------------------------------------------------
+        self.github_actions_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="ECSRunTask",
+                actions=["ecs:RunTask"],
+                resources=[
+                    f"arn:aws:ecs:{config.aws_region}:{config.aws_account_id}:task-definition/{config.project_prefix}-*"
                 ],
             )
         )

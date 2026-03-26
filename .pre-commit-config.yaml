@@ -21,7 +21,7 @@ repos:
 
     ### Python Tools ###
 -   repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.6
+    rev: v0.15.7
     hooks:
     -   id: ruff-check
         args: [--fix]
@@ -38,7 +38,7 @@ repos:
 
     ### Data & Config Validation ###
 -   repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.37.0
+    rev: 0.37.1
     hooks:
     -   id: check-github-workflows
         name: "🐙 github-actions · Validate gh workflow files"
