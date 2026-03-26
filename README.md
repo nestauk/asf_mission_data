@@ -23,17 +23,18 @@ uv sync
 source .venv/bin/activate
 
 # Or run commands directly without activating
-uv run python -m asf_mission_data.pipeline.example.handler
+uv run python -m asf_mission_data.run example --stage all
 ```
 
 ### Running pipelines locally
 
 ```bash
-# Set local data root (pipelines will read/write here instead of S3)
+# Set local mode (otherwise the default is the dev S3 bucket)
+export DATA_MODE=LOCAL
 export DATA_ROOT=/tmp/pipeline-dev
 
 # Run the example pipeline
-uv run python -m asf_mission_data.pipeline.example.handler
+uv run python -m asf_mission_data.run example --stage all
 
 # Check output
 ls /tmp/pipeline-dev/
@@ -44,7 +45,7 @@ Or use the `.env.example` file:
 ```bash
 cp .env.example .env
 source .env
-uv run python -m asf_mission_data.pipeline.example.handler
+uv run python -m asf_mission_data.run example --stage all
 ```
 
 ## Developer setup
@@ -131,6 +132,32 @@ All pipelines are registered in `pipelines.yaml`. Update this file when adding a
 ## Deployment
 
 *(TODO: Document CI/CD workflow)*
+
+## Docker
+
+Build the image with a canonical tag:
+
+```bash
+docker build -t asf-mission-data .
+```
+
+Run a pipeline in a local filesystem-backed mode:
+
+```bash
+mkdir -p /tmp/asf-mission-data
+
+docker run --rm \
+  -e DATA_MODE=LOCAL \
+  -e DATA_ROOT=/tmp/asf-mission-data \
+  -v /tmp/asf-mission-data:/tmp/asf-mission-data \
+  asf-mission-data \
+  example --stage all
+```
+
+Notes:
+
+- The image tag above is `asf-mission-data`, not `asf_mission_data`.
+- If you omit `DATA_MODE`/`DATA_ROOT`, the container defaults to the dev S3 location and expects the corresponding AWS runtime configuration.
 
 ## Runbook
 
