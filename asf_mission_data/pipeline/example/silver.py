@@ -1,7 +1,7 @@
 """
 Where silver stage code should live.
 The example pipeline transforms raw bank holidays JSON
-into a DataFrame, validates it, and persists as parquet.
+into a DataFrame, validates it, and persists as parquet
 """
 
 import pandas as pd
