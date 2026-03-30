@@ -3,6 +3,7 @@
 Usage:
     python scripts/trigger_pipeline.py example --stage all
     python scripts/trigger_pipeline.py <pipeline_name> --stage bronze
+    python scripts/trigger_pipeline.py <pipeline_name> --capacity-provider FARGATE_SPOT
 """
 
 import argparse
@@ -29,14 +30,26 @@ def parse_args() -> argparse.Namespace:
         default="all",
         help="Which stage to run (default: all)",
     )
+    parser.add_argument(
+        "--capacity-provider",
+        choices=["FARGATE", "FARGATE_SPOT"],
+        default=os.environ.get("ECS_CAPACITY_PROVIDER", "FARGATE"),
+        help="Which ECS capacity provider to use (default: ECS_CAPACITY_PROVIDER or FARGATE)",
+    )
     return parser.parse_args()
 
 
-def run_task(pipeline: str, stage: str) -> None:
+def run_task(pipeline: str, stage: str, capacity_provider: str) -> None:
     params: dict[str, Any] = {
         "cluster": CLUSTER,
         "taskDefinition": TASK_FAMILY,
         "count": 1,
+        "capacityProviderStrategy": [
+            {
+                "capacityProvider": capacity_provider,
+                "weight": 1,
+            }
+        ],
         "networkConfiguration": {
             "awsvpcConfiguration": {
                 "subnets": SUBNET_IDS,
@@ -70,6 +83,7 @@ def run_task(pipeline: str, stage: str) -> None:
     task_arn = response["tasks"][0]["taskArn"]
     task_id = task_arn.split("/")[-1]
     print(f"Task started: {task_id}")
+    print(f"Capacity:     {capacity_provider}")
     print(
         f"Watch it:     aws ecs describe-tasks --cluster {CLUSTER} --tasks {task_id}"  # noqa: E501
     )
@@ -78,4 +92,4 @@ def run_task(pipeline: str, stage: str) -> None:
 
 if __name__ == "__main__":
     args = parse_args()
-    run_task(args.pipeline, args.stage)
+    run_task(args.pipeline, args.stage, args.capacity_provider)

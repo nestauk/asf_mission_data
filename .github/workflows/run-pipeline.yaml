@@ -25,6 +25,7 @@ env:
   AWS_REGION: eu-west-2
   ECS_CLUSTER: asf-mission-data-dev
   ECS_TASK_FAMILY: asf-mission-data-dev
+  ECS_CAPACITY_PROVIDER: FARGATE
   ECS_SUBNETS: "subnet-5cc6e511,subnet-eb6fcb82,subnet-1de6f466"
   ECS_SECURITY_GROUPS: "sg-0df80dcbbc597eabb"
 
