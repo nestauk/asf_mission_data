@@ -17,6 +17,11 @@ on:
           - silver
           - gold
         default: all
+      wait_for_completion:
+        description: 'Wait for the ECS task to finish and stream logs into GitHub Actions'
+        required: true
+        type: boolean
+        default: false
 
 # Passes the infra values through to trigger_pipeline.py.
 # For now its just dev but when we are out of POC and using
@@ -32,10 +37,10 @@ env:
 jobs:
   trigger:
     runs-on: ubuntu-latest
-    # safety net in case something hangs like API call stalling
-    # kill the job after 5 mins rather than let it eat all our github
-    # actions minutes
-    timeout-minutes: 5
+    # Default runs still finish quickly because waiting is opt-in.
+    # When a caller asks to wait for completion we keep enough budget
+    # for the ECS task to run and stream its logs back here.
+    timeout-minutes: 60
     # This is for OIDC authentication
     permissions:
       contents: read
@@ -61,4 +66,10 @@ jobs:
 
       - name: Trigger pipeline
         run: |
-          uv run python scripts/trigger_pipeline.py ${{ inputs.pipeline }} --stage ${{ inputs.stage }}
+          args=("${{ inputs.pipeline }}" "--stage" "${{ inputs.stage }}")
+
+          if [ "${{ inputs.wait_for_completion }}" = "true" ]; then
+            args+=("--wait" "--follow-logs")
+          fi
+
+          uv run python scripts/trigger_pipeline.py "${args[@]}"
