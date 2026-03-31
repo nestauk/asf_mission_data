@@ -141,7 +141,7 @@ class LatestPriceCapValidator(DataValidator):
         return ValidationResult(
             passes=valid,
             message=f"Expected publication date: {latest_publication_date.strftime(format='%d-%m-%Y')}, "
-            "saw publication date {publication_date.strftime(format='%d-%m-%Y')}",
+            f"saw publication date {publication_date.strftime(format='%d-%m-%Y')}",
         )
 
 
