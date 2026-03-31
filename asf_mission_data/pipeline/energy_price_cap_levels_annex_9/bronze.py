@@ -1,4 +1,3 @@
-import logging
 import re
 from pathlib import Path
 from urllib.parse import urljoin
@@ -7,13 +6,14 @@ from bs4 import BeautifulSoup
 from hamilton.function_modifiers import check_output_custom
 
 from asf_mission_data import storage, utils
+from asf_mission_data.logging_utils import setup_logging
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import (
     PRICE_CAP_PERIOD_PUBLICATION_DATES,
     PRICE_CAP_PERIOD_STRING_PATTERN,
 )
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.validators import LatestPriceCapFileUrlValidator, LatestPriceCapValidator
 
-logger = logging.getLogger(__name__)
+logger = setup_logging(__name__)
 
 
 def latest_collection_page_html_soup(collection_url: str) -> BeautifulSoup:
