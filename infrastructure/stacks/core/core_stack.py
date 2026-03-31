@@ -62,20 +62,34 @@ class CoreStack(Stack):
         # =================================================================
         # ECR Repository for Pipeline Images
         # =================================================================
-        self.ecr_repo = ecr.Repository(
-            self,
-            "PipelineRepo",
-            repository_name=config.ecr_repo_name,
-            image_scan_on_push=True,
-            lifecycle_rules=[
-                ecr.LifecycleRule(
-                    description=f"Keep last {config.ecr_max_image_count} images",
-                    max_image_count=config.ecr_max_image_count,
-                )
-            ],
-            removal_policy=removal_policy,
-            empty_on_delete=config.environment != "prod",  # Don't delete images in prod for safety
-        )
+        # Share one ECR repository across environments so app stacks can
+        # consistently reference `asf-mission-data`.
+        if config.environment == "dev":
+            self.ecr_repo = ecr.Repository(
+                self,
+                "PipelineRepo",
+                repository_name=config.ecr_repo_name,
+                image_scan_on_push=True,
+                lifecycle_rules=[
+                    ecr.LifecycleRule(
+                        description=f"Keep last {config.ecr_max_image_count} images",
+                        max_image_count=config.ecr_max_image_count,
+                    )
+                ],
+                removal_policy=removal_policy,
+                empty_on_delete=config.environment
+                != "prod",  # Don't delete images in prod for safety
+            )
+
+            # This repository is shared across environments, so its tag should
+            # reflect that rather than inheriting the stack-wide env tag.
+            cdk.Tags.of(self.ecr_repo).add("Environment", "shared", priority=300)
+        else:
+            self.ecr_repo = ecr.Repository.from_repository_name(
+                self,
+                "PipelineRepo",
+                config.ecr_repo_name,
+            )
 
         # =================================================================
         # GitHub Actions OIDC Role

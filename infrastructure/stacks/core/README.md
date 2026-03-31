@@ -56,8 +56,8 @@ The Core Stack provides shared infrastructure resources for all ASF Mission Data
 
 | Environment | S3 Bucket | ECR Repository | IAM Role |
 |-------------|-----------|----------------|----------|
-| dev | `asf-mission-data-dev` | `asf-pipelines-dev` | `asf-github-actions-dev` |
-| prod | `asf-mission-data-prod` | `asf-pipelines-prod` | `asf-github-actions-prod` |
+| dev | `asf-mission-data-dev` | `asf-mission-data` | `asf-github-actions-dev` |
+| prod | `asf-mission-data-prod` | `asf-mission-data` | `asf-github-actions-prod` |
 
 ## Dependencies
 
@@ -108,13 +108,13 @@ aws s3 ls s3://asf-mission-data-dev/
 
 ```bash
 # List images
-aws ecr describe-images --repository-name asf-pipelines-dev
+aws ecr describe-images --repository-name asf-mission-data
 
 # Login to ECR
 aws ecr get-login-password --region eu-west-2 | docker login --username AWS --password-stdin ACCOUNT_ID.dkr.ecr.eu-west-2.amazonaws.com
 
 # Push an image
-docker push ACCOUNT_ID.dkr.ecr.eu-west-2.amazonaws.com/asf-pipelines-dev:latest
+docker push ACCOUNT_ID.dkr.ecr.eu-west-2.amazonaws.com/asf-mission-data:latest
 ```
 
 ### IAM Role (for debugging)

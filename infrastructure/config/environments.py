@@ -42,7 +42,7 @@ class EnvironmentConfig:
     @property
     def ecr_repo_name(self) -> str:
         """ECR repository for pipeline container images"""
-        return f"{self.project_prefix}-pipelines-{self.environment}"
+        return "asf-mission-data"
 
     @property
     def github_actions_role_name(self) -> str:

@@ -135,7 +135,7 @@ Infrastructure is managed with [AWS CDK](https://aws.amazon.com/cdk/) (Python).
 | Resource | Dev | Prod |
 |----------|-----|------|
 | S3 bucket | `asf-mission-data-dev` | `asf-mission-data-prod` |
-| ECR repository | `asf-pipelines-dev` | `asf-pipelines-prod` |
+| ECR repository | `asf-mission-data` | `asf-mission-data` |
 | GitHub Actions IAM role | `asf-github-actions-dev` | `asf-github-actions-prod` |
 
 ### Deploying infrastructure

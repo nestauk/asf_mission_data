@@ -28,4 +28,4 @@ jobs:
           echo "Environment: ${{ vars.ENV_NAME }}"
           aws sts get-caller-identity --output table
           aws s3 ls s3://${{ secrets.MISSION_DATA_BUCKET }}/
-          aws ecr describe-repositories --repository-names asf-pipelines-${{ vars.ENV_NAME }}
+          aws ecr describe-repositories --repository-names asf-mission-data
