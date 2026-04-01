@@ -1,31 +1,26 @@
-# Lambda entry point
-# Driver construction for hamilton
+# Pipeline entry point
+"""
+This needs to define the main function
+that orchestrates the execution of the
+pipeline stages.
+"""
 
-import logging
 from datetime import datetime, timezone
 from importlib.metadata import version
 
 from hamilton import driver
 
 from asf_mission_data import storage, utils
+from asf_mission_data.logging_utils import setup_logging
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9 import bronze, gold, silver
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import (
     ENERGY_PRICE_CAP_LEVELS_ANNEX_9,
 )
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
-)
-
-# -------------------------------------------------------------
-# Bronze
-# -------------------------------------------------------------
+logger = setup_logging(__name__)
 
 
-# TODO refactor to be more generic and move to common module
-def build_bronze_driver() -> driver.Builder:
+def build_bronze_driver() -> driver.Driver:
     """Construct a Hamilton driver configured for the  bronze layer of the
     energy price cap Annex 9 pipeline.
 
@@ -55,7 +50,7 @@ def build_bronze_driver() -> driver.Builder:
     return dr
 
 
-def run_bronze_pipeline():
+def run_bronze_pipeline() -> None:
     """Run the bronze layer of the energy price cap Annex 9 ETL pipeline.
 
     This function performs the bronze layer workflow:
@@ -93,14 +88,7 @@ def run_bronze_pipeline():
     )
 
 
-# -------------------------------------------------------------
-# Silver
-# -------------------------------------------------------------
-
-
-# TODO refactor to be more generic and move to common module
-# TODO naming convention for different silver DAG drivers
-def build_silver_1c_consumption_adjusted_levels_driver() -> driver.Builder:
+def build_silver_1c_consumption_adjusted_levels_driver() -> driver.Driver:
     """Construct a Hamilton driver for the silver layer processing of tariff tables.
 
     This driver is configured with the `silver` nodes module and the relevant
@@ -122,7 +110,7 @@ def build_silver_1c_consumption_adjusted_levels_driver() -> driver.Builder:
     return dr
 
 
-def run_silver_pipeline():
+def run_silver_pipeline() -> None:
     """Execute the silver layer workflow for tariff tables in the Energy Price Cap Levels Annex 9 pipeline.
 
     Workflow steps:
@@ -221,7 +209,14 @@ def run_gold_pipeline():
 # Pipeline execution entry point
 # -------------------------------------------------------------
 
-if __name__ == "__main__":
-    # run_bronze_pipeline()
-    # run_silver_pipeline()
-    run_gold_pipeline()
+
+def run(stage: str = "bronze", extra_args: list[str] | None = None) -> None:
+    if stage in ("bronze", "all"):
+        logger.info("Starting bronze stage")
+        run_bronze_pipeline()
+        logger.info("Completed bronze stage")
+
+    if stage in ("silver", "all"):
+        logger.info("Starting silver stage")
+        run_silver_pipeline()
+        logger.info("Completed silver stage")

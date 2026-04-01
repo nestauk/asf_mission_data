@@ -3,11 +3,21 @@
 import json
 import logging
 import os
+from typing import Any, cast
 
 import fsspec
 import pandas as pd
 
 logger = logging.getLogger(__name__)
+
+VALID_DATA_ROOTS = {
+    "LOCAL": None,
+    "DEV": "s3://asf-mission-data-dev",
+    "PROD": "s3://asf-mission-data-prod",
+}
+
+DEFAULT_DATA_MODE = "DEV"
+DEFAULT_HEARTBEAT_ROOT = "s3://asf-heartbeats-dev"
 
 
 def get_data_path(relative_path: str) -> str:
@@ -16,13 +26,13 @@ def get_data_path(relative_path: str) -> str:
     Set DATA_ROOT environment variable to control where data is stored:
     - Local dev: DATA_ROOT=/tmp/pipeline-dev
     - AWS dev: DATA_ROOT=s3://asf-mission-data-dev
-    - AWS prod: Leave unset (defaults to prod bucket)
+    - AWS prod: DATA_MODE=PROD and DATA_ROOT=s3://asf-mission-data-prod
 
     Example:
         >>> get_data_path("bronze/energy-cap/data.parquet")
         '/tmp/pipeline-dev/bronze/energy-cap/data.parquet'
     """
-    base = os.environ.get("DATA_ROOT", "s3://asf-mission-data-prod")
+    base = os.environ.get("DATA_ROOT", VALID_DATA_ROOTS[DEFAULT_DATA_MODE])
     return f"{base}/{relative_path}"
 
 
@@ -30,16 +40,16 @@ def get_heartbeat_path(pipeline_name: str) -> str:
     """Get path for pipeline heartbeat file.
 
     Uses HEARTBEAT_ROOT if set, otherwise falls back to DATA_ROOT,
-    otherwise defaults to the prod heartbeats bucket.
+    otherwise defaults to the dev heartbeats bucket.
     """
     base = os.environ.get(
         "HEARTBEAT_ROOT",
-        os.environ.get("DATA_ROOT", "s3://asf-heartbeats-prod"),
+        os.environ.get("DATA_ROOT", DEFAULT_HEARTBEAT_ROOT),
     )
     return f"{base}/heartbeats/{pipeline_name}.json"
 
 
-def _initialise_environment():
+def _initialise_environment() -> tuple[str, str]:
     """Validate and load storage configuration from environment variables.
 
     Reads from:
@@ -63,31 +73,27 @@ def _initialise_environment():
             configuration for the selected mode.
     """
 
-    valid_modes = {
-        "LOCAL": "",
-        "DEV": "s3://asf-mission-data-dev",
-        "PROD": "s3://asf-mission-data-prod",
-        # "DEV-TEST": "s3://asf-mission-data-tool",
-    }
-
-    data_mode = os.getenv("DATA_MODE", "PROD")
-    data_root = os.getenv("DATA_ROOT")
-
-    if data_mode not in valid_modes:
+    data_mode = os.getenv("DATA_MODE", DEFAULT_DATA_MODE)
+    if data_mode not in VALID_DATA_ROOTS:
         raise ValueError(f"Invalid DATA_MODE: {data_mode}")
 
+    default_root = VALID_DATA_ROOTS[data_mode]
+    data_root = os.getenv("DATA_ROOT", default_root if default_root is not None else "")
+
     if data_mode in ("DEV", "PROD"):
-        if data_root != valid_modes[data_mode]:
-            raise ValueError(f"Mismatch: {data_mode} requires {valid_modes[data_mode]}")
+        if data_root != VALID_DATA_ROOTS[data_mode]:
+            raise ValueError(f"Mismatch: {data_mode} requires {VALID_DATA_ROOTS[data_mode]}")
 
     elif data_mode == "LOCAL":
-        if data_root in (valid_modes["DEV"], valid_modes["PROD"]):
+        if not data_root:
+            raise ValueError("LOCAL requires DATA_ROOT to be set to a local directory.")
+        if data_root.startswith("s3://"):
             raise ValueError(f"Local mode cannot point to cloud storage {data_root}.")
 
     return data_mode, data_root
 
 
-def persist(uri: str, content: bytes | dict) -> None:
+def persist(uri: str, content: bytes | str | dict[str, Any]) -> None:
     """Persist content to a local or cloud storage location.
     Supports URI schemes like local file paths or S3 URIs.
 
@@ -100,14 +106,17 @@ def persist(uri: str, content: bytes | dict) -> None:
 
     Args:
         uri (str): Target storage location.
-        content (bytes | dict): Data to persist. Dictionaries are serialised to JSON.
-            Bytes are written directly.
+        content (bytes | str | dict[str, Any]): Data to persist. Dictionaries are
+            serialised to JSON. Bytes are written directly.
     """
 
+    serialised_content: bytes | str
     if isinstance(content, dict):
-        content = json.dumps(content, indent=2)
+        serialised_content = json.dumps(content, indent=2)
+    else:
+        serialised_content = content
 
-    mode = "wb" if isinstance(content, bytes) else "w"
+    mode = "wb" if isinstance(serialised_content, bytes) else "w"
 
     fs, path = fsspec.core.url_to_fs(uri)
 
@@ -116,7 +125,7 @@ def persist(uri: str, content: bytes | dict) -> None:
         fs.mkdirs(parent, exist_ok=True)
 
     with fs.open(path, mode) as f:
-        f.write(content)
+        f.write(serialised_content)
 
     logger.info("Saved: %s", uri)
 
@@ -160,7 +169,7 @@ def ingest_to_bronze(
     file: bytes | str,
     filename: str,
     date_stamp: str,
-    metadata: dict,
+    metadata: dict[str, Any],
     layer_prefix: str = "bronze",
 ) -> None:
     """Persists raw dataset files and associated metadata to the bronze storage layer.
@@ -193,7 +202,7 @@ def ingest_to_bronze(
             Defaults to "bronze".
     """
 
-    data_mode, data_root = _initialise_environment()
+    _, data_root = _initialise_environment()
 
     base_path = f"{data_root}/data/{layer_prefix}/{dataset_prefix}"
     historical_file = f"{base_path}/historical/{date_stamp}/file/{filename}"
@@ -239,7 +248,7 @@ def save_dag(
         date_stamp (str): Canonical timestamp or partition identifier for historical storage.
     """
 
-    data_mode, data_root = _initialise_environment()
+    _, data_root = _initialise_environment()
 
     base_path = f"{data_root}/artifacts/dags/{layer_prefix}/{dataset_prefix}"
     historical_file = f"{base_path}/{date_stamp}/{accompanying_filename}.dag.png"
@@ -250,7 +259,7 @@ def locate_latest_bronze(
     dataset_prefix: str,
     file_or_metadata: str = "file",
     layer_prefix: str = "bronze",
-) -> str:
+) -> str | None:
     """Locate the latest bronze dataset file or metadata for a given pipeline.
 
     Args:
@@ -264,7 +273,7 @@ def locate_latest_bronze(
         ValueError: If `file_or_metadata` is not 'file' or 'metadata'.
 
     Returns:
-        str: URI of the latest bronze file or metadata, or None if not found.
+        str | None: URI of the latest bronze file or metadata, or None if not found.
     """
 
     if file_or_metadata not in ["file", "metadata"]:
@@ -278,7 +287,7 @@ def locate_latest_bronze(
 
     if not fs.exists(path):
         logger.info("Prefix does not exist: %s", uri_prefix)
-        return
+        return None
 
     files = fs.glob(path + "/*")
 
@@ -286,7 +295,7 @@ def locate_latest_bronze(
 
     if not files:
         logger.info("No files found under prefix: %s", uri_prefix)
-        return
+        return None
 
     logger.info(
         "Found %d item(s) under prefix: %s",
@@ -294,7 +303,7 @@ def locate_latest_bronze(
         uri_prefix,
     )
 
-    return fs.unstrip_protocol(files[0])
+    return cast(str, fs.unstrip_protocol(files[0]))
 
 
 def read_excel_sheet(excel_uri: str, sheet_name: str) -> pd.DataFrame:
@@ -313,17 +322,17 @@ def read_excel_sheet(excel_uri: str, sheet_name: str) -> pd.DataFrame:
         return df
     except Exception as e:
         logger.error(f"Failed to load tab '{sheet_name}' from Excel file '{excel_uri}' as dataframe: {e}")
-        raise e
+        raise
 
 
-def read_json(json_uri: str) -> any:
+def read_json(json_uri: str) -> Any:
     """Read a JSON file from local or remote storage.
 
     Args:
         json_uri (str): URI or path to the JSON file.
 
     Returns:
-        any: Parsed JSON content.
+        Any: Parsed JSON content.
     """
 
     try:
