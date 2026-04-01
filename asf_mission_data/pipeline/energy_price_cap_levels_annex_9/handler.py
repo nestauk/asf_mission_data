@@ -208,13 +208,31 @@ def run_gold_pipeline():
     """
 
     gold_dr = build_gold_driver()
-    gold_dr.execute(["gold_1c_consumption_adjusted_levels_with_vat_parquet"])
-    gold_dr.execute(["gold_tariff_component_rates_parquet"])
-    gold_dr.execute(["gold_price_ratios_parquet"])
-    gold_dr.execute(["gold_annual_bill_fixed_and_variable_component_contributions_parquet"])
 
-    # TODO decide whether we need this if we want to save DAG images for gold
-    # latest_price_cap_period_str = gold_dr.execute("latest_price_cap_period")["latest_price_cap_period"]
+    node_targets = [
+        "gold_1c_consumption_adjusted_levels_with_vat_parquet",
+        "gold_tariff_component_rates_parquet",
+        "gold_price_ratios_parquet",
+        "gold_annual_bill_fixed_and_variable_component_contributions_parquet",
+        "latest_price_cap_period",
+    ]
+
+    results = gold_dr.execute(node_targets)
+
+    gold_data_nodes = [n for n in node_targets if n.startswith("gold_")]
+
+    for node in gold_data_nodes:
+        dag_png = gold_dr.visualize_execution([node], None, render_kwargs={}).pipe(format="png")
+
+        accompanying_filename = node.replace("_parquet", "")
+
+        storage.save_dag(
+            layer_prefix="gold",
+            dataset_prefix=ENERGY_PRICE_CAP_LEVELS_ANNEX_9["dataset_prefix"],
+            accompanying_filename=accompanying_filename,
+            dag_image=dag_png,
+            date_stamp=f"period={utils.normalise_energy_price_cap_period_string(results['latest_price_cap_period'])}",
+        )
 
 
 # -------------------------------------------------------------
@@ -222,6 +240,6 @@ def run_gold_pipeline():
 # -------------------------------------------------------------
 
 if __name__ == "__main__":
-    # run_bronze_pipeline()
-    # run_silver_pipeline()
+    run_bronze_pipeline()
+    run_silver_pipeline()
     run_gold_pipeline()
