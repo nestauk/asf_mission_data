@@ -51,6 +51,16 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Compute image tags
+        id: tag
+        run: |
+          BRANCH_SLUG="${GITHUB_REF_NAME//\//-}"
+          if [ "$GITHUB_REF_NAME" = "dev" ]; then
+            echo "value=dev-latest" >> $GITHUB_OUTPUT
+          else
+            echo "value=${BRANCH_SLUG}-latest" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
