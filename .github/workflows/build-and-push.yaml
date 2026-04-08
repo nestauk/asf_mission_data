@@ -53,6 +53,7 @@ jobs:
 
       - name: Compute image tags
         id: tag
+        # For the tag, we want to use the branch name, but convert any slashes to dashes as they'd break the tag
         run: |
           BRANCH_SLUG="${GITHUB_REF_NAME//\//-}"
           echo "value=${BRANCH_SLUG}-latest"
