@@ -55,11 +55,8 @@ jobs:
         id: tag
         run: |
           BRANCH_SLUG="${GITHUB_REF_NAME//\//-}"
-          if [ "$GITHUB_REF_NAME" = "dev" ]; then
-            echo "value=dev-latest"
-          else
-            echo "value=${BRANCH_SLUG}-latest"
-          fi
+          echo "value=${BRANCH_SLUG}-latest"
+          echo "value=${BRANCH_SLUG}-latest" >> $GITHUB_OUTPUT
 
       - name: Build and push image
         uses: docker/build-push-action@v6
@@ -67,7 +64,7 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64
-          tags: ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPO }}:dev-latest
+          tags: ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPO }}:${{ steps.tag.outputs.value }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
@@ -75,4 +72,4 @@ jobs:
       - name: Summary
         run: |
           echo "### Image pushed to ECR" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPO }}:dev-latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPO }}:${{ steps.tag.outputs.value }}\`" >> $GITHUB_STEP_SUMMARY
