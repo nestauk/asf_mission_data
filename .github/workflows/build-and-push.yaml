@@ -56,9 +56,9 @@ jobs:
         run: |
           BRANCH_SLUG="${GITHUB_REF_NAME//\//-}"
           if [ "$GITHUB_REF_NAME" = "dev" ]; then
-            echo "value=dev-latest" >> $GITHUB_OUTPUT
+            echo "value=dev-latest"
           else
-            echo "value=${BRANCH_SLUG}-latest" >> $GITHUB_OUTPUT
+            echo "value=${BRANCH_SLUG}-latest"
           fi
 
       - name: Build and push image
