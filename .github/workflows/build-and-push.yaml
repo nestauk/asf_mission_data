@@ -1,10 +1,33 @@
-  name: Build and push to ECR
+name: Build and push Docker Image to ECR
 
-  on:
-    workflow_dispatch:
+# Script environment variables
+env:
+  ECR_REPO: asf-mission-data
+  AWS_REGION: eu-west-2
 
-  jobs:
-    placeholder:
-      runs-on: ubuntu-latest
-      steps:
-        - run: echo "Placeholder — real workflow is on feature branch"
+# Triggers
+on:
+  # Trigger the action manually from the UI
+  workflow_dispatch:
+  # Trigger the action when pushed to dev branch
+  push:
+    branches: [dev]
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+        # Compute image tags based on branch name
+      - name: Compute image tags
+        id: tag
+        run: |
+          BRANCH_SLUG="${GITHUB_REF_NAME//\//-}"
+          echo "value=${BRANCH_SLUG}-latest"
