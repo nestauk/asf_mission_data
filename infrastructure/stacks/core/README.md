@@ -39,6 +39,7 @@ The Core Stack provides shared infrastructure resources for all ASF Mission Data
 | Lambda | `asf-*` functions | Create/update pipeline functions |
 | IAM | `asf-*` roles | Create Lambda execution roles |
 | Scheduler | `asf-*` schedules | Create EventBridge schedules |
+| ECS | `*` + `asf-*` task definitions | Describe/register/run ECS task definitions for manual pipeline runs |
 | CloudWatch Logs | `asf-*` log groups | Create log groups for Lambdas |
 
 ## Configuration

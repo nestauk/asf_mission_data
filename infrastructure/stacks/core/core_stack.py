@@ -258,6 +258,24 @@ class CoreStack(Stack):
         # -----------------------------------------------------------------
         self.github_actions_role.add_to_policy(
             iam.PolicyStatement(
+                sid="ECSDescribeTaskDefinition",
+                actions=["ecs:DescribeTaskDefinition"],
+                resources=["*"],
+            )
+        )
+
+        self.github_actions_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="ECSRegisterTaskDefinition",
+                actions=["ecs:RegisterTaskDefinition"],
+                resources=[
+                    f"arn:aws:ecs:{config.aws_region}:{config.aws_account_id}:task-definition/{config.project_prefix}-*"
+                ],
+            )
+        )
+
+        self.github_actions_role.add_to_policy(
+            iam.PolicyStatement(
                 sid="ECSRunTask",
                 actions=["ecs:RunTask"],
                 resources=[
