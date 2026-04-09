@@ -71,3 +71,5 @@ def run(stage: str = "bronze", extra_args: list[str] | None = None) -> None:
         logger.info("Starting silver stage")
         run_silver_pipeline()
         logger.info("Completed silver stage")
+
+    print("Pipeline execution completed successfully.")
