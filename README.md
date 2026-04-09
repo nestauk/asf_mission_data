@@ -48,6 +48,8 @@ source .env
 uv run python -m asf_mission_data.run example --stage all
 ```
 
+For the full local-vs-AWS workflow, see [docs/running-pipelines.md](docs/running-pipelines.md).
+
 ## Developer setup
 
 ### Pre-commit and code formatting
@@ -172,7 +174,7 @@ All pipelines are registered in `pipelines.yaml`. Update this file when adding a
 
 ## Deployment
 
-*(TODO: Document CI/CD workflow)*
+For the supported ways to build images and run pipelines in AWS, see [docs/running-pipelines.md](docs/running-pipelines.md).
 
 ## Docker
 
@@ -202,4 +204,4 @@ Notes:
 
 ## Runbook
 
-*(TODO: Agree on doc strategy)*
+Start with [docs/running-pipelines.md](docs/running-pipelines.md) for the standard local, GitHub UI, and ad hoc AWS run paths.
