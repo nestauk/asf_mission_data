@@ -174,7 +174,18 @@ def render_registry(pipeline: str):
     bronze_filename = (
         "Annex-9-Levelisation-allowance-methodology-and-levelised-cap-levels-v1.9.xlsx"  # TODO how to read from bronze latest_filename
     )
-    silver_tables = [str("1c Consumption adjusted levels").lower().replace(" ", "_")]  # TODO how to read from all instances of silver sheet_name
+
+    # TODO refactor away from manual definition
+    silver_tables = {
+        "silver_table_1": {
+            "sheet_name": "1c Consumption adjusted levels",
+            "s3_name": "1c_consumption_adjusted_levels.parquet",  # this is sheet name in snake case
+            "ducklake_name": "EnergyPriceCapLevelsAnnex9_silver_1cConsumptionAdjustedLevels",
+            # {pascal case pipeline}_{stage}_{sheet name in pascal case}
+            "superset_name": "EnergyPriceCapLevelsAnnex9_silver_1cConsumptionAdjustedLevels",
+            # {pascal case pipeline}_{stage}_{sheet name in pascal case}
+        }
+    }
 
     environment = Environment(loader=FileSystemLoader("templates/"))
     template = environment.get_template("dataset_registry.txt")

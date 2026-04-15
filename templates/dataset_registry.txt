@@ -3,6 +3,10 @@ filename: {{ bronze_filename }}
 
 ## silver
 tables:
-{% for table in silver_tables %}
-- {{ table }}
+{% for table_name, table in silver_tables.items() %}
+### {{ table_name }}
+
+{% for key, value in table.items() %}
+- **{{ key }}**: {{ value }}
+{% endfor %}
 {% endfor %}
