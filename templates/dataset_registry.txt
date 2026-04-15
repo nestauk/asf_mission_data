@@ -1,0 +1,8 @@
+## bronze
+filename: {{ bronze_filename }}
+
+## silver
+tables:
+{% for table in silver_tables %}
+- {{ table }}
+{% endfor %}
