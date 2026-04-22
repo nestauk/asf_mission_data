@@ -1,8 +1,5 @@
-# Pipeline entry point
 """
-This needs to define the main function
-that orchestrates the execution of the
-pipeline stages.
+Main functions that orchestrate the execution of the pipeline stages.
 """
 
 from datetime import datetime, timezone
@@ -21,6 +18,9 @@ logger = setup_logging(__name__)
 
 
 def build_bronze_driver() -> driver.Driver:
+    """Construct Hamilton driver configured to execute the bronze layer DAG for the
+    Heat Pump Deployment Statistics pipeline.
+    """
 
     dr = (
         driver.Builder()
@@ -42,7 +42,11 @@ def build_bronze_driver() -> driver.Driver:
 
 
 def run_bronze_pipeline() -> None:
+    """Run the bronze layer of the Heat Pump Deployment Statistics pipeline.
 
+    Extracts and loads latest raw data file to storage.
+    DAG visualiation image is also generated and loaded to storage.
+    """
     dr = build_bronze_driver()
 
     node_targets = ["bronze_heat_pump_deployment_statistics_file", "latest_filename", "latest_publication_date"]
@@ -66,7 +70,9 @@ def run_bronze_pipeline() -> None:
 
 
 def build_silver_driver(sheet_name: str) -> driver.Driver:
-
+    """Construct general Hamilton driver configured to execute a silver layer DAG for a specific table in
+    the Heat Pump Deployment Statistics pipeline.
+    """
     dr = (
         driver.Builder()
         .with_modules(silver)
@@ -77,6 +83,11 @@ def build_silver_driver(sheet_name: str) -> driver.Driver:
 
 
 def run_silver_pipeline() -> None:
+    """Run the silver layer of the Heat Pump Deployment Statistics pipeline for Table 1.1 and Table 1.2.
+
+    Extracts latest bronze file, transforms into silver tables and loads to silver-layer storage.
+    DAG visualiation images are also generated and loaded to storage.
+    """
 
     tables = [
         ("Table 1.1", "silver_heat_pump_deployment_statistics_table_1_1_parquet"),
@@ -100,6 +111,7 @@ def run_silver_pipeline() -> None:
 
 
 def run(stage: str = "bronze", extra_args: list[str] | None = None) -> None:
+    """Pipeline execution entry point."""
     if stage in ("bronze", "all"):
         logger.info("Starting bronze stage")
         run_bronze_pipeline()

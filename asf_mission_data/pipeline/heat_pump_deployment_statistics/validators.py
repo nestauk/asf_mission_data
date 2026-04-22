@@ -1,3 +1,5 @@
+"""Classes for custom validators used to check Hamilton node outputs in the Heat Pump Deployment Statistics pipeline."""
+
 from datetime import datetime
 from typing import Type
 
@@ -70,3 +72,32 @@ class WithinThreeCalendarMonthsValidator(DataValidator):
 
         except Exception as e:
             return ValidationResult(passes=False, message=f"Failed to parse date '{data}'. Expected format: 'DD Month YYYY'. Error: {e}")
+
+
+class StartStringValidator(DataValidator):
+    """Checks that extracted string includes expected content by checking that it starts with a search string."""
+
+    def __init__(self, expected_start_string: str, importance: str = "fail"):
+        super(StartStringValidator, self).__init__(importance=importance)
+        self.expected_start_string = expected_start_string
+
+    def applies_to(self, datatype: Type) -> bool:
+        return datatype is str
+
+    def description(self) -> str:
+        return "Checks that extracted string includes expected content by checking that it starts with a search string."
+
+    @classmethod
+    def name(cls) -> str:
+        return "StartStringValidator"
+
+    def validate(self, data: str) -> ValidationResult:
+        valid = data.lower().startswith(self.expected_start_string.lower())
+
+        message = (
+            (f"Unexpected string: '{data}'. Expected a string starting with '{self.expected_start_string}'.")
+            if not valid
+            else (f"Expected start string '{self.expected_start_string}'. Read '{data}'")
+        )
+
+        return ValidationResult(passes=valid, message=message)

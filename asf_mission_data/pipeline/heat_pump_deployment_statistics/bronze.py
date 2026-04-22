@@ -1,3 +1,5 @@
+"""Hamilton nodes for bronze-layer of the Heat Pump Deployment Statistics pipeline"""
+
 import re
 from pathlib import Path
 from urllib.parse import urljoin
