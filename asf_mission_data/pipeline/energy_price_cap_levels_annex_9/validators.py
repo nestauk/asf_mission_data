@@ -1,3 +1,5 @@
+"""Classes for custom validators used to check Hamilton node outputs in the Energy Price Cap Levels Annex 9 pipeline."""
+
 import re
 from datetime import datetime
 from typing import Type
@@ -142,7 +144,7 @@ class LatestPriceCapValidator(DataValidator):
         return ValidationResult(
             passes=valid,
             message=f"Expected publication date: {latest_publication_date.strftime(format='%d-%m-%Y')}, "
-            "saw publication date {publication_date.strftime(format='%d-%m-%Y')}",
+            f"saw publication date {publication_date.strftime(format='%d-%m-%Y')}",
         )
 
 

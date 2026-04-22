@@ -10,6 +10,13 @@ pipelines:
     owner: alexandra
     schedule: never  # Template only, not scheduled
     description: Example pipeline demonstrating conventions
-    source_url: n/a
+    source_url: https://www.gov.uk/bank-holidays.json
     stages: [bronze, silver]
-    stack_name: n/a
+    stack_name: tbc
+  energy_price_cap_levels_annex_9:
+    owner: Elysia
+    schedule:  TBC
+    description: Ofgem energy price cap Annex 9 Final levelised cap rates model data
+    sourve_url: https://www.ofgem.gov.uk/energy-regulation/domestic-and-non-domestic/energy-pricing-rules/energy-price-cap/energy-price-cap-default-tariff-levels
+    stages: [bronze, silver]
+    stack_name: TBC

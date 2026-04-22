@@ -1,6 +1,4 @@
-"""Hamilton nodes for silver-layer of the Energy Price Cap Levels Annex 9 pipeline"""
-
-import logging
+"""Hamilton nodes for silver-layer of the Energy Price Cap Levels Annex 9 pipeline."""
 
 import pandas as pd
 from hamilton.function_modifiers import (
@@ -13,13 +11,14 @@ from hamilton.function_modifiers import (
 )
 
 from asf_mission_data import storage, utils
+from asf_mission_data.logging_utils import setup_logging
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import PRICE_CAP_PERIOD_PUBLICATION_DATES
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.schemas import (
     SILVER_1C_CONSUMPTION_ADJUSTED_LEVELS_SCHEMA,
 )
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.validators import PriceCapValidator
 
-logger = logging.getLogger(__name__)
+logger = setup_logging(__name__)
 
 # ----------------------------------
 # Common silver nodes
@@ -577,8 +576,3 @@ def silver_energy_price_cap_annex_9_1c_consumption_adjusted_levels_parquet(
         df_name=sheet_name.lower().replace(" ", "_"),
         date_stamp=price_cap_period_prefix,
     )
-
-
-# ----------------------------------
-# Silver dataset 2: XXXX
-# ----------------------------------

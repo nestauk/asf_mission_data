@@ -1,0 +1,68 @@
+name: Build and push Docker Image to ECR
+
+# Script environment variables
+env:
+  ECR_REPO: asf-mission-data
+  AWS_REGION: eu-west-2
+
+# Triggers
+on:
+  # Trigger the action manually from the UI
+  workflow_dispatch:
+  # Trigger the action when pushed to dev branch
+  push:
+    branches: [dev]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+      - name: Run tests
+        run: |
+          uv sync --group dev
+          uv run pytest
+
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/asf-github-actions-dev
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-BuildPush-${{ github.run_id }}
+
+      - name: Log in to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          tags: ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPO }}:dev-latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+      - name: Summary
+        run: |
+          echo "### Image pushed to ECR" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPO }}:dev-latest\`" >> $GITHUB_STEP_SUMMARY
