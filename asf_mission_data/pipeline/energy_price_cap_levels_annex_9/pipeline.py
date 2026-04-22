@@ -9,7 +9,7 @@ from hamilton import driver
 
 from asf_mission_data import storage, utils
 from asf_mission_data.logging_utils import setup_logging
-from asf_mission_data.pipeline.energy_price_cap_levels_annex_9 import bronze, silver
+from asf_mission_data.pipeline.energy_price_cap_levels_annex_9 import bronze, gold, silver
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import (
     ENERGY_PRICE_CAP_LEVELS_ANNEX_9,
 )
@@ -96,7 +96,7 @@ def run_silver_pipeline() -> None:
     DAG visualiation images are also generated and loaded to storage.
     """
 
-    # add to this as more Annex 9 tables are processed
+    # add to this as more Annex 9 silver tables are processed
     tables = [("1c Consumption adjusted levels", "silver_energy_price_cap_annex_9_1c_consumption_adjusted_levels_parquet")]
 
     for sheet_name, output_node in tables:
@@ -115,6 +115,62 @@ def run_silver_pipeline() -> None:
         )
 
 
+def build_gold_driver(silver_table_prefix: str) -> driver.Driver:
+    """Construct a general Hamilton driver configured to execute gold layer DAGs from a specified silver table in
+    the Energy Price Cap Annex 9 pipeline.
+    """
+    dr = (
+        driver.Builder()
+        .with_modules(gold)
+        .with_config({"dataset_prefix": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["dataset_prefix"], "silver_table_prefix": silver_table_prefix})
+        .build()
+    )
+    return dr
+
+
+def run_gold_pipeline() -> None:
+    """Run the gold layer for the Energy Price Cap Levels Annex 9 pipeline.
+
+    Gold datasets generated:
+        1. Consumption-adjusted tariff levels including VAT as an explicit component
+        2. Tariff component standing charges (p/day) and unit prices (p/kWh) for each fuel,
+            payment method and price cap period.
+        3. Price ratios for electricity (single-rate) and gas,
+            for each payment method and price cap period.
+        4. Annual bill contriutions from standing charges and consumption-based costs for
+            each fuel, payment method and price cap period.
+    """
+
+    # add to this as more Annex 9 silver and gold tables are processed
+    tables = [
+        (
+            "1c_consumption_adjusted_levels",
+            [
+                "gold_1c_consumption_adjusted_levels_with_vat_parquet",
+                "gold_tariff_component_rates_parquet",
+                "gold_price_ratios_parquet",
+                "gold_annual_bill_fixed_and_variable_component_contributions_parquet",
+            ],
+        )
+    ]
+
+    for silver_table_prefix, output_nodes in tables:
+        driver = build_gold_driver(silver_table_prefix=silver_table_prefix)
+
+        results = driver.execute(output_nodes + ["latest_price_cap_period"])
+
+        for node in output_nodes:
+            dag_png = driver.visualize_execution([node]).pipe(format="png")
+            accompanying_filename = node.replace("_parquet", "")
+            storage.save_dag(
+                layer_prefix="gold",
+                dataset_prefix=ENERGY_PRICE_CAP_LEVELS_ANNEX_9["dataset_prefix"],
+                accompanying_filename=accompanying_filename,
+                dag_image=dag_png,
+                date_stamp=f"period={utils.normalise_energy_price_cap_period_string(results['latest_price_cap_period'])}",
+            )
+
+
 def run(stage: str = "bronze", extra_args: list[str] | None = None) -> None:
     """Pipeline execution entry point."""
     if stage in ("bronze", "all"):
@@ -126,3 +182,8 @@ def run(stage: str = "bronze", extra_args: list[str] | None = None) -> None:
         logger.info("Starting silver stage")
         run_silver_pipeline()
         logger.info("Completed silver stage")
+
+    if stage in ("gold", "all"):
+        logger.info("Starting gold stage")
+        run_gold_pipeline()
+        logger.info("Completed gold stage")

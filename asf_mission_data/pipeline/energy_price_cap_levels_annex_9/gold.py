@@ -1,4 +1,4 @@
-"""Hamilton nodes for gold-layer of the Energy Price Cap Levels Annex 9 pipeline"""
+"""Hamilton nodes for gold-layer of the Energy Price Cap Levels Annex 9 pipeline."""
 
 import logging
 
@@ -26,39 +26,17 @@ logger = logging.getLogger(__name__)
 
 
 def silver_energy_price_cap_annex_9_dataset(dataset_prefix: str, silver_table_prefix: str) -> str:
-    """Locate the latest silver-level dataset for Energy Price Cap Annex 9.
-
-    Args:
-        dataset_prefix (str): Prefix identifying dataset in storage.
-        silver_table_prefix (str): Prefix identifying the silver dataset in storage.
-
-    Returns:
-        str: URI or file path to the latest Annex 9 silver dataset.
-    """
+    """Latest silver-level dataset for Energy Price Cap Annex 9."""
     return storage.locate_latest_silver(dataset_prefix, silver_table_prefix)
 
 
 def silver_df(silver_energy_price_cap_annex_9_dataset: str) -> pd.DataFrame:
-    """Read Annex 9 dataset into a pandas DataFrame.
-
-    Args:
-        silver_energy_price_cap_annex_9_dataset (str): URI or file path to the latest Annex 9 silver dataset.
-
-    Returns:
-        pd.DataFrame: Annex 9 silver level dataframe.
-    """
+    """Silver Annex 9 dataset loaded as pandas DataFrame."""
     return storage.read_parquet(silver_energy_price_cap_annex_9_dataset)
 
 
 def latest_price_cap_period(silver_df: pd.DataFrame) -> str:
-    """Extract the latest price cap period from the silver DataFrame metadata.
-
-    Args:
-        silver_df (pd.DataFrame): Annex 9 silver level dataframe.
-
-    Returns:
-        str: Latest price cap period string.
-    """
+    """Latest price cap period from the silver DataFrame metadata."""
     metadata_dict = silver_df["metadata"][0]
     return metadata_dict.get("price_cap_period")
 
@@ -146,18 +124,7 @@ def gold_1c_consumption_adjusted_levels_with_vat_df(
 def gold_1c_consumption_adjusted_levels_with_vat_parquet(
     gold_1c_consumption_adjusted_levels_with_vat_df: pd.DataFrame, dataset_prefix: str, latest_price_cap_period: str
 ) -> None:
-    """Persist the gold-layer consumption-adjusted tariff levels with VAT as a parquet file.
-
-    This function ingests the prepared gold DataFrame into the gold storage
-    layer as a parquet dataset. The dataset is stored under `/latest` and a
-    `/historical` period-based partition derived from the latest price cap period.
-
-    Args:
-        gold_1c_consumption_adjusted_levels_with_vat_df (pd.DataFrame): Gold-layer
-            DataFrame containing consumption-adjusted tariff levels including VAT.
-        dataset_prefix (str): Dataset identifier used to namespace storage.
-        latest_price_cap_period (str): Period used to timestamp the dataset.
-    """
+    """Persist the gold-layer consumption-adjusted tariff levels with VAT as a parquet file."""
     storage.ingest_to_gold(
         dataset_prefix=dataset_prefix,
         df=gold_1c_consumption_adjusted_levels_with_vat_df,
@@ -285,18 +252,7 @@ def gold_tariff_component_rates_df(
 
 def gold_tariff_component_rates_parquet(gold_tariff_component_rates_df: pd.DataFrame, dataset_prefix: str, latest_price_cap_period: str) -> None:
     """Persist the gold-layer standing charge and unit rates for each component
-    as a parquet file.
-
-    This function ingests the prepared gold DataFrame into the gold storage
-    layer as a parquet dataset. The dataset is stored under `/latest` and a
-    `/historical` period-based partition derived from the latest price cap period.
-
-    Args:
-        gold_tariff_component_rates_df (pd.DataFrame): Gold-layer DataFrame containing standing charge and unit rates for
-            each component and associated metadata.
-        dataset_prefix (str): Dataset identifier used to namespace storage.
-        latest_price_cap_period (str): Period used to timestamp the dataset.
-    """
+    as a parquet file."""
     storage.ingest_to_gold(
         dataset_prefix=dataset_prefix,
         df=gold_tariff_component_rates_df,
@@ -395,18 +351,7 @@ def gold_price_ratios_df(total_unit_rates_df: pd.DataFrame, silver_df: pd.DataFr
 
 
 def gold_price_ratios_parquet(gold_price_ratios_df: pd.DataFrame, dataset_prefix: str, latest_price_cap_period: str) -> None:
-    """Persist the gold-layer dataset for electricity-to-gas price ratios as a parquet file.
-
-    This function ingests the prepared gold DataFrame into the gold storage
-    layer as a parquet dataset. The dataset is stored under `/latest` and a
-    `/historical` period-based partition derived from the latest price cap period.
-
-    Args:
-        gold_price_ratios_df (pd.DataFrame): Gold-layer DataFrame containing
-            calculated electricity-to-gas price ratios and associated metadata.
-        dataset_prefix (str): Dataset identifier used to namespace storage.
-        latest_price_cap_period (str): Period used to timestamp the dataset.
-    """
+    """Persist the gold-layer dataset for electricity-to-gas price ratios as a parquet file."""
     storage.ingest_to_gold(
         dataset_prefix=dataset_prefix,
         df=gold_price_ratios_df,
@@ -448,6 +393,7 @@ def annual_bill_fixed_and_variable_contributions_df(consumption_adjusted_levels_
         tariff component, and price cap period, with columns ``Type``,
         ``Unit`` ("GBP/year"), and ``value``.
     """
+
     index_cols = [
         "Payment method",
         "Fuel",
@@ -539,18 +485,7 @@ def gold_annual_bill_fixed_and_variable_component_contributions_parquet(
     gold_annual_bill_fixed_and_variable_component_contributions_df: pd.DataFrame, dataset_prefix: str, latest_price_cap_period: str
 ) -> None:
     """Persist the gold-layer dataset for gas and electricity unit prices, electricity-to-gas price ratios
-    as a parquet file.
-
-    This function ingests the prepared gold DataFrame into the gold storage
-    layer as a parquet dataset. The dataset is stored under `/latest` and a
-    `/historical` period-based partition derived from the latest price cap period.
-
-    Args:
-        gold_annual_bill_fixed_and_variable_component_contributions_df (pd.DataFrame): Gold-layer DataFrame
-            containing annual bill fixed and variable component contributions along with associated metadata.
-        dataset_prefix (str): Dataset identifier used to namespace storage.
-        latest_price_cap_period (str): Period used to timestamp the dataset.
-    """
+    as a parquet file."""
     storage.ingest_to_gold(
         dataset_prefix=dataset_prefix,
         df=gold_annual_bill_fixed_and_variable_component_contributions_df,
