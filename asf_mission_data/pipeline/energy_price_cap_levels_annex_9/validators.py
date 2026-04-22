@@ -1,3 +1,5 @@
+"""Classes for custom validators used to check Hamilton node outputs in the Energy Price Cap Levels Annex 9 pipeline."""
+
 import re
 from datetime import datetime
 from typing import Type
