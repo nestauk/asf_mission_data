@@ -36,32 +36,6 @@ PRICE_CAP_PERIOD_PUBLICATION_DATES = {
     "1 October to 31 December 2030": "2030-08-28",
 }
 
-BENCHMARK_CONSUMPTION = {  # MWh per year
-    "Gas": 11.5,
-    "Electricity: Single-Rate Metering Arrangement": 2.7,
-    "Electricity: Multi-Register Metering Arrangement": 3.9,
-}
-
-COMPONENT_CATEGORY_MAP = {
-    "DF": "Wholesale",  # Direct fuel
-    "CM": "Wholesale",  # Capacity market
-    "AA": "Other",  # Adjustment allowance
-    "PC": "Policy",  # Policy costs
-    "NC": "Network",  # Network costs
-    "OC": "Operating",  # Operating costs
-    "SMNCC": "Operating",  # Smart Meter Net Cost Change
-    "IC": "Operating",  # Industry charge
-    "PAAC": "Operating",  # Payment method adjustment additional cost
-    "PAP": "Operating",  # Payment method adjustment percentage
-    "CO": "Operating",  # Core operating costs
-    "DRC": "Operating",  # Debt-Related costs
-    "EBIT": "Other",  # Earnings Before interest and Tax
-    "HAP": "Other",  # Headroom allowance
-    "Levelisation ": "Other",  # Levelisation, note that this intentionally ends with a blankspace
-    "VAT": "VAT",
-    "Total_GB average": "Total_GB average",
-}
-
 # Excel sheet name - Silver table Hamilton output node
 SILVER_TABLES_NODES_MAP = {"1c Consumption adjusted levels": "silver_energy_price_cap_annex_9_1c_consumption_adjusted_levels_parquet"}
 

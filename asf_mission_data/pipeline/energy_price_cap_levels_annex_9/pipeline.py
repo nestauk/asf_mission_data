@@ -9,12 +9,11 @@ from hamilton import driver
 
 from asf_mission_data import storage, utils
 from asf_mission_data.logging_utils import setup_logging
-from asf_mission_data.pipeline.energy_price_cap_levels_annex_9 import bronze, gold, silver
+from asf_mission_data.pipeline.energy_price_cap_levels_annex_9 import bronze, silver
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import (
     COLLECTION_URL,
     DATASET_PREFIX,
     FILE_LINK_TEXT,
-    GOLD_TABLES_NODES_MAP,
     PUBLISHER,
     SILVER_TABLES_NODES_MAP,
 )
@@ -112,44 +111,6 @@ def run_silver_pipeline() -> None:
         )
 
 
-def build_gold_driver(silver_table_prefix: str) -> driver.Driver:
-    """Construct a general Hamilton driver configured to execute gold layer DAGs from a specified silver table in
-    the Energy Price Cap Annex 9 pipeline.
-    """
-    dr = driver.Builder().with_modules(gold).with_config({"dataset_prefix": DATASET_PREFIX, "silver_table_prefix": silver_table_prefix}).build()
-    return dr
-
-
-def run_gold_pipeline() -> None:
-    """Run the gold layer for the Energy Price Cap Levels Annex 9 pipeline.
-
-    Gold datasets generated:
-        1. Consumption-adjusted tariff levels including VAT as an explicit component
-        2. Tariff component standing charges (p/day) and unit prices (p/kWh) for each fuel,
-            payment method and price cap period.
-        3. Price ratios for electricity (single-rate) and gas,
-            for each payment method and price cap period.
-        4. Annual bill contriutions from standing charges and consumption-based costs for
-            each fuel, payment method and price cap period.
-    """
-
-    for silver_table_prefix, output_nodes in GOLD_TABLES_NODES_MAP.items():
-        driver = build_gold_driver(silver_table_prefix=silver_table_prefix)
-
-        results = driver.execute(output_nodes + ["latest_price_cap_period"])
-
-        for node in output_nodes:
-            dag_png = driver.visualize_execution([node]).pipe(format="png")
-            accompanying_filename = node.replace("_parquet", "")
-            storage.save_dag(
-                layer_prefix="gold",
-                dataset_prefix=DATASET_PREFIX,
-                accompanying_filename=accompanying_filename,
-                dag_image=dag_png,
-                date_stamp=f"period={utils.normalise_energy_price_cap_period_string(results['latest_price_cap_period'])}",
-            )
-
-
 def run(stage: str = "bronze", extra_args: list[str] | None = None) -> None:
     """Pipeline execution entry point."""
     if stage in ("bronze", "all"):
@@ -161,8 +122,3 @@ def run(stage: str = "bronze", extra_args: list[str] | None = None) -> None:
         logger.info("Starting silver stage")
         run_silver_pipeline()
         logger.info("Completed silver stage")
-
-    if stage in ("gold", "all"):
-        logger.info("Starting gold stage")
-        run_gold_pipeline()
-        logger.info("Completed gold stage")
