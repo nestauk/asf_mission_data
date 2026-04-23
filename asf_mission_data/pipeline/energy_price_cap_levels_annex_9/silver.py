@@ -1,4 +1,4 @@
-"""Hamilton nodes for silver-layer of the Energy Price Cap Levels Annex 9 pipeline"""
+"""Hamilton nodes for silver-layer of the Energy Price Cap Levels Annex 9 pipeline."""
 
 import pandas as pd
 from hamilton.function_modifiers import (
@@ -576,8 +576,3 @@ def silver_energy_price_cap_annex_9_1c_consumption_adjusted_levels_parquet(
         df_name=sheet_name.lower().replace(" ", "_"),
         date_stamp=price_cap_period_prefix,
     )
-
-
-# ----------------------------------
-# Silver dataset 2: XXXX
-# ----------------------------------

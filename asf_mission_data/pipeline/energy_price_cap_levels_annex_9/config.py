@@ -1,12 +1,5 @@
 """
 Static configuration values for extracting Energy Price Cap Levels Annex 9 data from Ofgem.
-
-Bronze-layer: Source metadata and lookup parameters required to locate and download the
-'Final levelised cap rates model (Annex 9)' from Ofgem's publication page.
-- pipeline_name for canonical namespace
-- publisher
-- collection_url
-- file_link_text
 """
 
 ENERGY_PRICE_CAP_LEVELS_ANNEX_9 = {
@@ -43,4 +36,30 @@ PRICE_CAP_PERIOD_PUBLICATION_DATES = {
     "1 April to 30 June 2030": "2030-02-27",
     "1 July to 30 September 2030": "2030-05-29",
     "1 October to 31 December 2030": "2030-08-28",
+}
+
+BENCHMARK_CONSUMPTION = {  # MWh per year
+    "Gas": 11.5,
+    "Electricity: Single-Rate Metering Arrangement": 2.7,
+    "Electricity: Multi-Register Metering Arrangement": 3.9,
+}
+
+COMPONENT_CATEGORY_MAP = {
+    "DF": "Wholesale",  # Direct fuel
+    "CM": "Wholesale",  # Capacity market
+    "AA": "Other",  # Adjustment allowance
+    "PC": "Policy",  # Policy costs
+    "NC": "Network",  # Network costs
+    "OC": "Operating",  # Operating costs
+    "SMNCC": "Operating",  # Smart Meter Net Cost Change
+    "IC": "Operating",  # Industry charge
+    "PAAC": "Operating",  # Payment method adjustment additional cost
+    "PAP": "Operating",  # Payment method adjustment percentage
+    "CO": "Operating",  # Core operating costs
+    "DRC": "Operating",  # Debt-Related costs
+    "EBIT": "Other",  # Earnings Before interest and Tax
+    "HAP": "Other",  # Headroom allowance
+    "Levelisation ": "Other",  # Levelisation, note that this intentionally ends with a blankspace
+    "VAT": "VAT",
+    "Total_GB average": "Total_GB average",
 }
