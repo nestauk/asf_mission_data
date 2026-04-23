@@ -2,6 +2,7 @@
 Main functions that orchestrate the execution of the pipeline stages for Energy Price Cap Levels Annex 9.
 """
 
+import re
 from datetime import datetime, timezone
 from importlib.metadata import version
 from pathlib import Path
@@ -13,7 +14,12 @@ from asf_mission_data import storage, utils
 from asf_mission_data.logging_utils import setup_logging
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9 import bronze, gold, silver
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import (
-    ENERGY_PRICE_CAP_LEVELS_ANNEX_9,
+    COLLECTION_URL,
+    DATASET_PREFIX,
+    FILE_LINK_TEXT,
+    GOLD_TABLES_NODES_MAP,
+    PUBLISHER,
+    SILVER_TABLES_NODES_MAP,
 )
 
 logger = setup_logging(__name__)
@@ -29,10 +35,10 @@ def build_bronze_driver() -> driver.Driver:
         .with_modules(bronze)
         .with_config(
             {
-                "dataset_prefix": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["dataset_prefix"],
-                "collection_url": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["collection_url"],
-                "file_link_text": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["file_link_text"],
-                "publisher": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["publisher"],
+                "dataset_prefix": DATASET_PREFIX,
+                "collection_url": COLLECTION_URL,
+                "file_link_text": FILE_LINK_TEXT,
+                "publisher": PUBLISHER,
                 "pipeline_version": version("asf-mission-data"),
                 "bronze_ingest_timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
             }
@@ -71,7 +77,7 @@ def run_bronze_pipeline() -> None:
     # save dag image
     storage.save_dag(
         layer_prefix="bronze",
-        dataset_prefix=ENERGY_PRICE_CAP_LEVELS_ANNEX_9["dataset_prefix"],
+        dataset_prefix=DATASET_PREFIX,
         accompanying_filename=latest_filename,
         dag_image=dag_png,
         date_stamp=f"period={utils.normalise_energy_price_cap_period_string(results['latest_price_cap_period'])}",
@@ -82,12 +88,7 @@ def build_silver_driver(sheet_name: str) -> driver.Driver:
     """Construct a general Hamilton driver configured to execute silver layer DAG for a specific table in
     the Energy Price Cap Annex 9 pipeline.
     """
-    dr = (
-        driver.Builder()
-        .with_modules(silver)
-        .with_config({"dataset_prefix": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["dataset_prefix"], "sheet_name": sheet_name})
-        .build()
-    )
+    dr = driver.Builder().with_modules(silver).with_config({"dataset_prefix": DATASET_PREFIX, "sheet_name": sheet_name}).build()
     return dr
 
 
@@ -98,10 +99,7 @@ def run_silver_pipeline() -> None:
     DAG visualiation images are also generated and loaded to storage.
     """
 
-    # add to this as more Annex 9 silver tables are processed
-    tables = [("1c Consumption adjusted levels", "silver_energy_price_cap_annex_9_1c_consumption_adjusted_levels_parquet")]
-
-    for sheet_name, output_node in tables:
+    for sheet_name, output_node in SILVER_TABLES_NODES_MAP.items():
         driver = build_silver_driver(sheet_name=sheet_name)
 
         results = driver.execute([output_node, "latest_price_cap_period"])
@@ -110,7 +108,7 @@ def run_silver_pipeline() -> None:
 
         storage.save_dag(
             layer_prefix="silver",
-            dataset_prefix=ENERGY_PRICE_CAP_LEVELS_ANNEX_9["dataset_prefix"],
+            dataset_prefix=DATASET_PREFIX,
             accompanying_filename=sheet_name.lower().replace(".", "_").replace(" ", "_"),
             dag_image=dag_png,
             date_stamp=f"period={utils.normalise_energy_price_cap_period_string(results['latest_price_cap_period'])}",
@@ -121,12 +119,7 @@ def build_gold_driver(silver_table_prefix: str) -> driver.Driver:
     """Construct a general Hamilton driver configured to execute gold layer DAGs from a specified silver table in
     the Energy Price Cap Annex 9 pipeline.
     """
-    dr = (
-        driver.Builder()
-        .with_modules(gold)
-        .with_config({"dataset_prefix": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["dataset_prefix"], "silver_table_prefix": silver_table_prefix})
-        .build()
-    )
+    dr = driver.Builder().with_modules(gold).with_config({"dataset_prefix": DATASET_PREFIX, "silver_table_prefix": silver_table_prefix}).build()
     return dr
 
 
@@ -143,20 +136,7 @@ def run_gold_pipeline() -> None:
             each fuel, payment method and price cap period.
     """
 
-    # add to this as more Annex 9 silver and gold tables are processed
-    tables = [
-        (
-            "1c_consumption_adjusted_levels",
-            [
-                "gold_1c_consumption_adjusted_levels_with_vat_parquet",
-                "gold_tariff_component_rates_parquet",
-                "gold_price_ratios_parquet",
-                "gold_annual_bill_fixed_and_variable_component_contributions_parquet",
-            ],
-        )
-    ]
-
-    for silver_table_prefix, output_nodes in tables:
+    for silver_table_prefix, output_nodes in GOLD_TABLES_NODES_MAP.items():
         driver = build_gold_driver(silver_table_prefix=silver_table_prefix)
 
         results = driver.execute(output_nodes + ["latest_price_cap_period"])
@@ -166,7 +146,7 @@ def run_gold_pipeline() -> None:
             accompanying_filename = node.replace("_parquet", "")
             storage.save_dag(
                 layer_prefix="gold",
-                dataset_prefix=ENERGY_PRICE_CAP_LEVELS_ANNEX_9["dataset_prefix"],
+                dataset_prefix=DATASET_PREFIX,
                 accompanying_filename=accompanying_filename,
                 dag_image=dag_png,
                 date_stamp=f"period={utils.normalise_energy_price_cap_period_string(results['latest_price_cap_period'])}",
@@ -194,20 +174,41 @@ def run(stage: str = "bronze", extra_args: list[str] | None = None) -> None:
 # TODO decide if this is the right place
 def render_registry(pipeline: str):
 
-    bronze_filename = (
-        "Annex-9-Levelisation-allowance-methodology-and-levelised-cap-levels-v1.9.xlsx"  # TODO how to read from bronze latest_filename
-    )
+    bronze_dr = build_bronze_driver()
+    bronze_outputs = bronze_dr.execute(["latest_filename"])
+    bronze_filename = bronze_outputs["latest_filename"]
 
-    # TODO refactor away from manual definition
+    def _to_pascal(text):
+        # Removes non-alphanumeric chars and capitalizes each word
+        return "".join(word.capitalize() for word in re.split(r"[^a-zA-Z0-9]", text))
+
+    def _to_snake(text):
+        # Lowers text and replaces spaces/special chars with underscores
+        return re.sub(r"[^a-zA-Z0-9]", "_", text.lower())
+
     silver_tables = {
-        "silver_table_1": {
-            "sheet_name": "1c Consumption adjusted levels",
-            "s3_name": "1c_consumption_adjusted_levels.parquet",  # this is sheet name in snake case
-            "ducklake_name": "EnergyPriceCapLevelsAnnex9_silver_1cConsumptionAdjustedLevels",
-            # {pascal case pipeline}_{stage}_{sheet name in pascal case}
-            "superset_name": "EnergyPriceCapLevelsAnnex9_silver_1cConsumptionAdjustedLevels",
-            # {pascal case pipeline}_{stage}_{sheet name in pascal case}
+        f"Silver table {i}": {
+            "Table name": sheet,
+            "S3 filename": f"{_to_snake(sheet)}.parquet",
+            "DuckLake table name": f"EnergyPriceCapLevelsAnnex9_silver_{_to_pascal(sheet)}",
+            "Superset dataset name": f"EnergyPriceCapLevelsAnnex9_silver_{_to_pascal(sheet)}",
         }
+        for i, sheet in enumerate(SILVER_TABLES_NODES_MAP.keys(), 1)
+    }
+
+    def _clean_gold_name(text):
+        # Removes the 'gold_' prefix and '_parquet' suffix
+        return text.replace("gold_", "").replace("_parquet", "")
+
+    gold_tables = {
+        f"Gold table {i}": {
+            "Source silver table": f"{silver_table}.parquet",
+            "S3 filename": f"{_clean_gold_name(gold_table)}.parquet",
+            "DuckLake table name": f"EnergyPriceCapLevelsAnnex9_gold_{_to_pascal(_clean_gold_name(gold_table))}",
+            "Superset dataset name": f"EnergyPriceCapLevelsAnnex9_gold_{_to_pascal(_clean_gold_name(gold_table))}",
+        }
+        for silver_table, gold_list in GOLD_TABLES_NODES_MAP.items()
+        for i, gold_table in enumerate(gold_list, 1)
     }
 
     environment = Environment(loader=FileSystemLoader("templates/"))
@@ -215,6 +216,6 @@ def render_registry(pipeline: str):
 
     path = Path(f"asf_mission_data/pipeline/{pipeline}/dataset_registry.md")
     path.parent.mkdir(parents=True, exist_ok=True)
-    content = template.render(bronze_filename=bronze_filename, silver_tables=silver_tables)
+    content = template.render(bronze_filename=bronze_filename, silver_tables=silver_tables, gold_tables=gold_tables)
     path.write_text(content, encoding="utf-8")
     logger.info(f"Wrote {path}")

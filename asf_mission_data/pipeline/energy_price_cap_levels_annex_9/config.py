@@ -2,12 +2,10 @@
 Static configuration values for extracting Energy Price Cap Levels Annex 9 data from Ofgem.
 """
 
-ENERGY_PRICE_CAP_LEVELS_ANNEX_9 = {
-    "dataset_prefix": "energy_price_cap_levels/annex_9",
-    "publisher": "Ofgem",
-    "collection_url": "https://www.ofgem.gov.uk/energy-regulation/domestic-and-non-domestic/energy-pricing-rules/energy-price-cap/energy-price-cap-default-tariff-levels",
-    "file_link_text": "Final levelised cap rates model (Annex 9)",
-}
+DATASET_PREFIX = "energy_price_cap_levels/annex_9"
+PUBLISHER = "Ofgem"
+COLLECTION_URL = "https://www.ofgem.gov.uk/energy-regulation/domestic-and-non-domestic/energy-pricing-rules/energy-price-cap/energy-price-cap-default-tariff-levels"
+FILE_LINK_TEXT = "Final levelised cap rates model (Annex 9)"
 
 # Regex pattern for expected price cap period dates string format on Ofgem website
 PRICE_CAP_PERIOD_STRING_PATTERN = r"(\d{1,2}\s+[A-Za-z]+\s+to\s+\d{1,2}\s+[A-Za-z]+\s+\d{4})"
@@ -62,4 +60,17 @@ COMPONENT_CATEGORY_MAP = {
     "Levelisation ": "Other",  # Levelisation, note that this intentionally ends with a blankspace
     "VAT": "VAT",
     "Total_GB average": "Total_GB average",
+}
+
+# Excel sheet name - Silver table Hamilton output node
+SILVER_TABLES_NODES_MAP = {"1c Consumption adjusted levels": "silver_energy_price_cap_annex_9_1c_consumption_adjusted_levels_parquet"}
+
+# Silver table prefix - Gold table Hamilton output node
+GOLD_TABLES_NODES_MAP = {
+    "1c_consumption_adjusted_levels": [
+        "gold_1c_consumption_adjusted_levels_with_vat_parquet",
+        "gold_tariff_component_rates_parquet",
+        "gold_price_ratios_parquet",
+        "gold_annual_bill_fixed_and_variable_component_contributions_parquet",
+    ]
 }

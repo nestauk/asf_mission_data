@@ -1,9 +1,19 @@
-## bronze
-filename: {{ bronze_filename }}
+## Bronze
+Filename: {{ bronze_filename }}
 
-## silver
+## Silver
 tables:
 {% for table_name, table in silver_tables.items() %}
+### {{ table_name }}
+
+{% for key, value in table.items() %}
+- **{{ key }}**: {{ value }}
+{% endfor %}
+{% endfor %}
+
+## Gold
+tables:
+{% for table_name, table in gold_tables.items() %}
 ### {{ table_name }}
 
 {% for key, value in table.items() %}
