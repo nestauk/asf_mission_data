@@ -11,7 +11,11 @@ from asf_mission_data import storage, utils
 from asf_mission_data.logging_utils import setup_logging
 from asf_mission_data.pipeline.heat_pump_deployment_statistics import bronze, silver
 from asf_mission_data.pipeline.heat_pump_deployment_statistics.config import (
-    HEAT_PUMP_DEPLOYMENT_STATISTICS,
+    COLLECTION_URL,
+    DATASET_PREFIX,
+    FILE_LINK_TEXT,
+    PAGE_LINK_TEXT,
+    PUBLISHER,
 )
 
 logger = setup_logging(__name__)
@@ -27,11 +31,11 @@ def build_bronze_driver() -> driver.Driver:
         .with_modules(bronze)
         .with_config(
             {
-                "dataset_prefix": HEAT_PUMP_DEPLOYMENT_STATISTICS["dataset_prefix"],
-                "collection_url": HEAT_PUMP_DEPLOYMENT_STATISTICS["collection_url"],
-                "page_link_text": HEAT_PUMP_DEPLOYMENT_STATISTICS["page_link_text"],
-                "file_link_text": HEAT_PUMP_DEPLOYMENT_STATISTICS["file_link_text"],
-                "publisher": HEAT_PUMP_DEPLOYMENT_STATISTICS["publisher"],
+                "dataset_prefix": DATASET_PREFIX,
+                "collection_url": COLLECTION_URL,
+                "page_link_text": PAGE_LINK_TEXT,
+                "file_link_text": FILE_LINK_TEXT,
+                "publisher": PUBLISHER,
                 "pipeline_version": version("asf-mission-data"),
                 "bronze_ingest_timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
             }
@@ -62,7 +66,7 @@ def run_bronze_pipeline() -> None:
     # save dag image
     storage.save_dag(
         layer_prefix="bronze",
-        dataset_prefix=HEAT_PUMP_DEPLOYMENT_STATISTICS["dataset_prefix"],
+        dataset_prefix=DATASET_PREFIX,
         accompanying_filename=results["latest_filename"],
         dag_image=dag_png,
         date_stamp=f"published={utils.normalise_date_string(results['latest_publication_date'])}",
@@ -73,12 +77,7 @@ def build_silver_driver(sheet_name: str) -> driver.Driver:
     """Construct general Hamilton driver configured to execute a silver layer DAG for a specific table in
     the Heat Pump Deployment Statistics pipeline.
     """
-    dr = (
-        driver.Builder()
-        .with_modules(silver)
-        .with_config({"dataset_prefix": HEAT_PUMP_DEPLOYMENT_STATISTICS["dataset_prefix"], "sheet_name": sheet_name})
-        .build()
-    )
+    dr = driver.Builder().with_modules(silver).with_config({"dataset_prefix": DATASET_PREFIX, "sheet_name": sheet_name}).build()
     return dr
 
 
@@ -103,7 +102,7 @@ def run_silver_pipeline() -> None:
 
         storage.save_dag(
             layer_prefix="silver",
-            dataset_prefix=HEAT_PUMP_DEPLOYMENT_STATISTICS["dataset_prefix"],
+            dataset_prefix=DATASET_PREFIX,
             accompanying_filename=sheet_name.lower().replace(".", "_").replace(" ", "_"),
             dag_image=dag_png,
             date_stamp=f"published={utils.normalise_date_string(results['latest_publication_date'])}",
