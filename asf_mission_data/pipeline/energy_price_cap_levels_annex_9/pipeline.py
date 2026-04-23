@@ -2,13 +2,10 @@
 Main functions that orchestrate the execution of the pipeline stages for Energy Price Cap Levels Annex 9.
 """
 
-import re
 from datetime import datetime, timezone
 from importlib.metadata import version
-from pathlib import Path
 
 from hamilton import driver
-from jinja2 import Environment, FileSystemLoader
 
 from asf_mission_data import storage, utils
 from asf_mission_data.logging_utils import setup_logging
@@ -169,53 +166,3 @@ def run(stage: str = "bronze", extra_args: list[str] | None = None) -> None:
         logger.info("Starting gold stage")
         run_gold_pipeline()
         logger.info("Completed gold stage")
-
-
-# TODO decide if this is the right place
-def render_registry(pipeline: str):
-
-    bronze_dr = build_bronze_driver()
-    bronze_outputs = bronze_dr.execute(["latest_filename"])
-    bronze_filename = bronze_outputs["latest_filename"]
-
-    def _to_pascal(text):
-        # Removes non-alphanumeric chars and capitalizes each word
-        return "".join(word.capitalize() for word in re.split(r"[^a-zA-Z0-9]", text))
-
-    def _to_snake(text):
-        # Lowers text and replaces spaces/special chars with underscores
-        return re.sub(r"[^a-zA-Z0-9]", "_", text.lower())
-
-    silver_tables = {
-        f"Silver table {i}": {
-            "Table name": sheet,
-            "S3 filename": f"{_to_snake(sheet)}.parquet",
-            "DuckLake table name": f"EnergyPriceCapLevelsAnnex9_silver_{_to_pascal(sheet)}",
-            "Superset dataset name": f"EnergyPriceCapLevelsAnnex9_silver_{_to_pascal(sheet)}",
-        }
-        for i, sheet in enumerate(SILVER_TABLES_NODES_MAP.keys(), 1)
-    }
-
-    def _clean_gold_name(text):
-        # Removes the 'gold_' prefix and '_parquet' suffix
-        return text.replace("gold_", "").replace("_parquet", "")
-
-    gold_tables = {
-        f"Gold table {i}": {
-            "Source silver table": f"{silver_table}.parquet",
-            "S3 filename": f"{_clean_gold_name(gold_table)}.parquet",
-            "DuckLake table name": f"EnergyPriceCapLevelsAnnex9_gold_{_to_pascal(_clean_gold_name(gold_table))}",
-            "Superset dataset name": f"EnergyPriceCapLevelsAnnex9_gold_{_to_pascal(_clean_gold_name(gold_table))}",
-        }
-        for silver_table, gold_list in GOLD_TABLES_NODES_MAP.items()
-        for i, gold_table in enumerate(gold_list, 1)
-    }
-
-    environment = Environment(loader=FileSystemLoader("templates/"))
-    template = environment.get_template("dataset_registry.txt")
-
-    path = Path(f"asf_mission_data/pipeline/{pipeline}/dataset_registry.md")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    content = template.render(bronze_filename=bronze_filename, silver_tables=silver_tables, gold_tables=gold_tables)
-    path.write_text(content, encoding="utf-8")
-    logger.info(f"Wrote {path}")
