@@ -38,13 +38,3 @@ PRICE_CAP_PERIOD_PUBLICATION_DATES = {
 
 # Excel sheet name - Silver table Hamilton output node
 SILVER_TABLES_NODES_MAP = {"1c Consumption adjusted levels": "silver_energy_price_cap_annex_9_1c_consumption_adjusted_levels_parquet"}
-
-# Silver table prefix - Gold table Hamilton output node
-GOLD_TABLES_NODES_MAP = {
-    "1c_consumption_adjusted_levels": [
-        "gold_1c_consumption_adjusted_levels_with_vat_parquet",
-        "gold_tariff_component_rates_parquet",
-        "gold_price_ratios_parquet",
-        "gold_annual_bill_fixed_and_variable_component_contributions_parquet",
-    ]
-}
