@@ -196,12 +196,11 @@ Resources:
       CapacityProviders:
         - FARGATE
         - FARGATE_SPOT
-      # Dev uses Spot (70% cheaper, tiny risk of interruption)
-      # Prod uses standard Fargate (reliable, slightly more expensive)
-      # NB: For 2-second tasks the risk of interruption is negligible,
-      # but we don't want to risk them in prod
+      # Use standard Fargate for both environments for predictable launches.
+      # We can reintroduce Spot later once the pipeline path is stable enough
+      # that occasional capacity failures are an acceptable tradeoff.
       DefaultCapacityProviderStrategy:
-        - CapacityProvider: !If [IsProd, FARGATE, FARGATE_SPOT]
+        - CapacityProvider: FARGATE
           Weight: 1
       ClusterSettings:
         - Name: containerInsights

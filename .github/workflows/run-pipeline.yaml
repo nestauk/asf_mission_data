@@ -1,0 +1,69 @@
+name: Run pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      pipeline:
+        description: 'Name of the pipeline to run (must match a key in pipelines.yaml)'
+        required: true
+        type: 'string'
+      stage:
+        description: 'Which stage(s) to run (all, bronze, silver, gold)'
+        required: true
+        type: choice
+        options:
+          - all
+          - bronze
+          - silver
+          - gold
+        default: all
+      image_tag:
+        description: 'ECR image tag to use for the pipeline run. Leave as dev-latest for normal runs. For testing branches, paste the tag from the build-and-push summary.'
+        required: false
+        type: 'string'
+        default: dev-latest
+
+# Passes the infra values through to trigger_pipeline.py.
+# For now its just dev but when we are out of POC and using
+# prod we can make this a matrix (or add a separate workflow possibly)
+env:
+  AWS_REGION: eu-west-2
+  ECS_CLUSTER: asf-mission-data-dev
+  ECS_TASK_FAMILY: asf-mission-data-dev
+  ECS_CAPACITY_PROVIDER: FARGATE
+  ECS_SUBNETS: "subnet-5cc6e511,subnet-eb6fcb82,subnet-1de6f466"
+  ECS_SECURITY_GROUPS: "sg-0df80dcbbc597eabb"
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    # safety net in case something hangs like API call stalling
+    # kill the job after 5 mins rather than let it eat all our github
+    # actions minutes
+    timeout-minutes: 5
+    # This is for OIDC authentication
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/asf-github-actions-dev
+          aws-region: ${{ env.AWS_REGION }}
+          # Including the run ID so we can trace which GitHub Actions run made which API calls in CloudTrail
+          role-session-name: GitHubActions-RunPipeline-${{ github.run_id }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Trigger pipeline
+        run: |
+          uv run python scripts/trigger_pipeline.py ${{ inputs.pipeline }} --stage ${{ inputs.stage }} --image-tag ${{ inputs.image_tag }}
