@@ -68,7 +68,9 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def get_app_container_image(container_definitions: list[dict[str, Any]]) -> str:
+def get_app_container_image(
+    container_definitions: list[dict[str, Any]],
+) -> str:
     for container in container_definitions:
         if container["name"] == "app":
             return container["image"]
@@ -95,9 +97,9 @@ def ensure_image_tag_exists(image_uri: str, image_tag: str) -> None:
     failures = response.get("failures", [])
     if failures:
         failure_codes = ", ".join(sorted({failure["failureCode"] for failure in failures}))
-        raise ValueError(f"Image tag '{image_tag}' was not found in ECR repository '{repository_name}' (failure: {failure_codes})")
+        raise ValueError(f"Could not find the image tag '{image_tag}' in ECR repository '{repository_name}' (failure: {failure_codes})")
 
-    raise ValueError(f"Image tag '{image_tag}' was not found in ECR repository '{repository_name}'")
+    raise ValueError(f"Could not find the image tag '{image_tag}' in ECR repository '{repository_name}'")
 
 
 def resolve_task_definition(image_tag: str) -> ResolvedTaskDefinition:
@@ -213,4 +215,9 @@ if __name__ == "__main__":
     emit_github_actions_annotation("notice", f"Container image: {resolved.app_image}")
     print(f"Task definition: {resolved.task_definition}")
     print(f"Container image: {resolved.app_image}")
-    run_task(args.pipeline, args.stage, args.capacity_provider, resolved.task_definition)
+    run_task(
+        args.pipeline,
+        args.stage,
+        args.capacity_provider,
+        resolved.task_definition,
+    )
