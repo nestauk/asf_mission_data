@@ -57,7 +57,7 @@ class CoreStack(Stack):
         # ECR Repository for Pipeline Images
         # =================================================================
         # Share one ECR repository across environments so app stacks can
-        # consistently reference `asf-mission-data`.
+        # consistently reference `asf-mission-data`
         if config.environment == "dev":
             self.ecr_repo = ecr.Repository(
                 self,
@@ -74,8 +74,8 @@ class CoreStack(Stack):
                 empty_on_delete=config.environment != "prod",  # Don't delete images in prod for safety
             )
 
-            # This repository is shared across environments, so its tag should
-            # reflect that rather than inheriting the stack-wide env tag.
+            # This repository is shared across environments, so its tag
+            # reflects that rather than inheriting the stack-wide env tag.
             cdk.Tags.of(self.ecr_repo).add("Environment", "shared", priority=300)
         else:
             self.ecr_repo = ecr.Repository.from_repository_name(
@@ -157,6 +157,14 @@ class CoreStack(Stack):
             )
         )
 
+        # Can't be given a resource-level permission FYI
+        self.github_actions_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="CloudformationValidation",
+                actions=["ecr:GetAuthorizationToken"],
+                resources=["*"],
+            )
+        )
         # -----------------------------------------------------------------
         # Lambda Permissions
         # -----------------------------------------------------------------
@@ -177,14 +185,6 @@ class CoreStack(Stack):
                     "lambda:UntagResource",
                 ],
                 resources=[f"arn:aws:lambda:{config.aws_region}:{config.aws_account_id}:function:{config.project_prefix}-*"],
-            )
-        )
-
-        self.github_actions_role.add_to_policy(
-            iam.PolicyStatement(
-                sid="CloudformationValidation",
-                actions=["ecr:GetAuthorizationToken"],
-                resources=["*"],
             )
         )
 
