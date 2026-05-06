@@ -5,6 +5,7 @@
 The Core Stack provides shared infrastructure resources for all ASF Mission Data pipelines. It creates the foundational S3 bucket, ECR repository, and GitHub Actions IAM role that pipeline stacks depend on. This stack must be deployed first before any pipeline stacks.
 
 ## Architecture
+
 -- # TO DO: add mermaid diagram
 
 ## Resources Created
@@ -22,25 +23,6 @@ The Core Stack provides shared infrastructure resources for all ASF Mission Data
 - **SSL**: Enforced for all requests
 - **Versioning**: Disabled (pipeline data is reproducible)
 - **Removal Policy**: RETAIN in prod, DESTROY in dev
-
-### ECR Repository Features
-
-- **Image Scanning**: Enabled on push
-- **Lifecycle Rules**: Keep last 10 images per repo
-- **Removal Policy**: RETAIN in prod, DESTROY in dev
-
-### GitHub Actions Role Permissions
-
-| Permission Set | Resources | Purpose |
-|----------------|-----------|---------|
-| ECR | Repository ARN | Push/pull container images |
-| S3 | Bucket ARN | Read/write pipeline data |
-| CloudFormation | `asf-*` stacks | Deploy pipeline stacks |
-| Lambda | `asf-*` functions | Create/update pipeline functions |
-| IAM | `asf-*` roles | Create Lambda execution roles |
-| Scheduler | `asf-*` schedules | Create EventBridge schedules |
-| ECS | `*` + `asf-*` task definitions | Describe/register/run ECS task definitions for manual pipeline runs |
-| CloudWatch Logs | `asf-*` log groups | Create log groups for Lambdas |
 
 ## Configuration
 
@@ -144,9 +126,11 @@ If GitHub Actions can't authenticate:
 
 1. Verify the OIDC provider exists in AWS IAM
 2. Check the trust policy subject claim:
+
    ```
    repo:nestauk/asf_mission_data:*
    ```
+
 3. Ensure workflow has `id-token: write` permission
 4. Check the audience is `sts.amazonaws.com`
 

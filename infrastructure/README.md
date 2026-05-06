@@ -115,7 +115,7 @@ uv sync --extra infrastructure
 
 ## Usage
 
-All CDK commands should be run from the repository root (not the `infrastructure/` directory).
+All CDK commands should be run from the `infrastructure/` directory (where `cdk.json` lives).
 
 ### Deploy
 

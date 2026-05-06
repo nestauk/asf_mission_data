@@ -50,6 +50,11 @@ class EnvironmentConfig:
         return f"{self.project_prefix}-github-actions-{self.environment}"
 
     @property
+    def ecs_cluster_name(self) -> str:
+        """ECS cluster name for pipeline tasks"""
+        return f"{self.project_prefix}-mission-data-{self.environment}"
+
+    @property
     def github_oidc_subject(self) -> str:
         """OIDC subject claim pattern for GitHub Actions"""
         return f"repo:{self.github_org}/{self.github_repo}:*"

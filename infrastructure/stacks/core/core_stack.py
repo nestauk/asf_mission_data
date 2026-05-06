@@ -6,9 +6,8 @@ Creates:
 - ECR repository for pipeline container images
 - IAM role for GitHub Actions deployments (OIDC)
 
-This stack is deployed once per environment. Individual pipeline
-are deployed via the GitHub Actions CI/CD,
-using the IAM role created here
+This stack is deployed once per environment. Individual pipelines
+are deployed via the GitHub Actions CI/CD using the IAM role created here.
 """
 
 import aws_cdk as cdk
@@ -16,9 +15,8 @@ from aws_cdk import CfnOutput, RemovalPolicy, Stack
 from aws_cdk import aws_ecr as ecr
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_s3 as s3
+from config.environments import EnvironmentConfig
 from constructs import Construct
-
-from infrastructure.config.environments import EnvironmentConfig
 
 
 class CoreStack(Stack):
@@ -34,13 +32,10 @@ class CoreStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
 
         self.config = config
+        is_prod = config.environment == "prod"
 
-        # This allows us to set what should happen to the resource
-        # if the stack is deleted
         # RETAIN in prod (protect data), DESTROY in dev (clean teardown)
-        removal_policy = (
-            RemovalPolicy.RETAIN if config.environment == "prod" else RemovalPolicy.DESTROY
-        )
+        removal_policy = RemovalPolicy.RETAIN if is_prod else RemovalPolicy.DESTROY
 
         # =================================================================
         # S3 Bucket
@@ -161,7 +156,6 @@ class CoreStack(Stack):
                     "cloudformation:Get*",
                     "cloudformation:Update*",
                     "cloudformation:Delete*",
-                    "cloudformation:ValidateTemplate",
                     "cloudformation:ExecuteChangeSet",
                 ],
                 resources=[
@@ -192,6 +186,14 @@ class CoreStack(Stack):
                 resources=[
                     f"arn:aws:lambda:{config.aws_region}:{config.aws_account_id}:function:{config.project_prefix}-*"
                 ],
+            )
+        )
+
+        self.github_actions_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="CloudformationValidation",
+                actions=["ecr:GetAuthorizationToken"],
+                resources=["*"],
             )
         )
 
@@ -249,28 +251,28 @@ class CoreStack(Stack):
                     "scheduler:UntagResource",
                 ],
                 resources=[
-                    f"arn:aws:scheduler:{config.aws_region}:{config.aws_account_id}:schedule/default/{config.project_prefix}-*"
+                    f"arn:aws:scheduler:{config.aws_region}:{config.aws_account_id}:schedule/default/{config.project_prefix}-*"  # noqa: E501
                 ],
             )
         )
         # -----------------------------------------------------------------
         # ECS Permissions (for triggering pipeline tasks)
         # -----------------------------------------------------------------
-        self.github_actions_role.add_to_policy(
-            iam.PolicyStatement(
-                sid="ECSDescribeTaskDefinition",
-                actions=["ecs:DescribeTaskDefinition"],
-                resources=["*"],
-            )
-        )
 
+        # Task definition IAM policies don't support resource-level
+        # permissions so we *have to* allow on all resources
+        # this is sneaky because you could add an arn under resource
+        # and it would just fail silently when the role tries to use it
         self.github_actions_role.add_to_policy(
             iam.PolicyStatement(
-                sid="ECSRegisterTaskDefinition",
-                actions=["ecs:RegisterTaskDefinition"],
-                resources=[
-                    f"arn:aws:ecs:{config.aws_region}:{config.aws_account_id}:task-definition/{config.project_prefix}-*"
+                sid="ECSTaskDefinition",
+                effect=iam.Effect.ALLOW,
+                actions=[
+                    "ecs:DescribeTaskDefinition",
+                    "ecs:RegisterTaskDefinition",
+                    "ecs:ListTaskDefinitions",
                 ],
+                resources=["*"],
             )
         )
 
@@ -278,6 +280,11 @@ class CoreStack(Stack):
             iam.PolicyStatement(
                 sid="ECSRunTask",
                 actions=["ecs:RunTask"],
+                conditions={
+                    "ArnEquals": {
+                        "ecs:cluster": f"arn:aws:ecs:{config.aws_region}:{config.aws_account_id}:cluster/{config.ecs_cluster_name}"  # noqa: E501
+                    }
+                },
                 resources=[
                     f"arn:aws:ecs:{config.aws_region}:{config.aws_account_id}:task-definition/{config.project_prefix}-*"
                 ],
@@ -299,7 +306,8 @@ class CoreStack(Stack):
                     "logs:DescribeLogGroups",
                 ],
                 resources=[
-                    f"arn:aws:logs:{config.aws_region}:{config.aws_account_id}:log-group:/aws/lambda/{config.project_prefix}-*"
+                    f"arn:aws:logs:{config.aws_region}:{config.aws_account_id}:"
+                    f"log-group:/aws/lambda/{config.project_prefix}-*"
                 ],
             )
         )
