@@ -50,8 +50,7 @@ class CoreStack(Stack):
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
             enforce_ssl=True,
             removal_policy=removal_policy,
-            auto_delete_objects=config.environment
-            != "prod",  # Leave objects in prod for safety even if we tear down the stack
+            auto_delete_objects=config.environment != "prod",  # Leave objects in prod for safety even if we tear down the stack
         )
 
         # =================================================================
@@ -72,8 +71,7 @@ class CoreStack(Stack):
                     )
                 ],
                 removal_policy=removal_policy,
-                empty_on_delete=config.environment
-                != "prod",  # Don't delete images in prod for safety
+                empty_on_delete=config.environment != "prod",  # Don't delete images in prod for safety
             )
 
             # This repository is shared across environments, so its tag should
@@ -90,10 +88,7 @@ class CoreStack(Stack):
         # GitHub Actions OIDC Role
         # =================================================================
         # References the pre-existing OIDC in the AWS account for GitHub Actions
-        github_provider_arn = (
-            f"arn:aws:iam::{config.aws_account_id}"
-            f":oidc-provider/token.actions.githubusercontent.com"
-        )
+        github_provider_arn = f"arn:aws:iam::{config.aws_account_id}:oidc-provider/token.actions.githubusercontent.com"
 
         self.github_actions_role = iam.Role(
             self,
@@ -158,9 +153,7 @@ class CoreStack(Stack):
                     "cloudformation:Delete*",
                     "cloudformation:ExecuteChangeSet",
                 ],
-                resources=[
-                    f"arn:aws:cloudformation:{config.aws_region}:{config.aws_account_id}:stack/{config.project_prefix}-*/*"
-                ],
+                resources=[f"arn:aws:cloudformation:{config.aws_region}:{config.aws_account_id}:stack/{config.project_prefix}-*/*"],
             )
         )
 
@@ -183,9 +176,7 @@ class CoreStack(Stack):
                     "lambda:ListTags",
                     "lambda:UntagResource",
                 ],
-                resources=[
-                    f"arn:aws:lambda:{config.aws_region}:{config.aws_account_id}:function:{config.project_prefix}-*"
-                ],
+                resources=[f"arn:aws:lambda:{config.aws_region}:{config.aws_account_id}:function:{config.project_prefix}-*"],
             )
         )
 
@@ -285,9 +276,7 @@ class CoreStack(Stack):
                         "ecs:cluster": f"arn:aws:ecs:{config.aws_region}:{config.aws_account_id}:cluster/{config.ecs_cluster_name}"  # noqa: E501
                     }
                 },
-                resources=[
-                    f"arn:aws:ecs:{config.aws_region}:{config.aws_account_id}:task-definition/{config.project_prefix}-*"
-                ],
+                resources=[f"arn:aws:ecs:{config.aws_region}:{config.aws_account_id}:task-definition/{config.project_prefix}-*"],
             )
         )
 
@@ -305,10 +294,7 @@ class CoreStack(Stack):
                     "logs:UntagResource",
                     "logs:DescribeLogGroups",
                 ],
-                resources=[
-                    f"arn:aws:logs:{config.aws_region}:{config.aws_account_id}:"
-                    f"log-group:/aws/lambda/{config.project_prefix}-*"
-                ],
+                resources=[f"arn:aws:logs:{config.aws_region}:{config.aws_account_id}:log-group:/aws/lambda/{config.project_prefix}-*"],
             )
         )
 

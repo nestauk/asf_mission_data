@@ -62,9 +62,7 @@ app = cdk.App()
 target_env = app.node.try_get_context("env") or os.getenv("DEPLOY_ENV", "dev")
 
 if target_env not in ENVIRONMENTS:
-    raise ValueError(
-        f"Unknown environment: {target_env}. Valid environments: {', '.join(ENVIRONMENTS.keys())}"
-    )
+    raise ValueError(f"Unknown environment: {target_env}. Valid environments: {', '.join(ENVIRONMENTS.keys())}")
 
 create_stacks(app, target_env)
 
