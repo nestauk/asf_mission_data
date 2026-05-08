@@ -133,12 +133,12 @@ class EcsStack(Stack):
             self,
             "ECSCluster",
             cluster_name=config.ecs_cluster_name,
+            vpc=vpc,
             # Container Insights = detailed CPU/memory monitoring. Costs extra.
             # Not worth it for batch tasks that run for 2 seconds.
             # Decided that CloudWatch Logs is enough.
             container_insights_v2=ecs.ContainerInsights.DISABLED,
             enable_fargate_capacity_providers=True,
-            default_cloud_map_namespace=None,
         )
 
         # Default to standard Fargate for predictable launches.
