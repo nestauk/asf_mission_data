@@ -62,7 +62,7 @@ class EcsStack(Stack):
             self,
             "LogGroup",
             log_group_name=f"/ecs/asf-mission-data-{config.environment}",
-            retention=logs.RetentionDays(config.log_retention_days),
+            retention=logs.RetentionDays.ONE_MONTH,
             removal_policy=cdk.RemovalPolicy.DESTROY,
         )
 
