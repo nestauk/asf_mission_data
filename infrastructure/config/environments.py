@@ -32,7 +32,7 @@ class EnvironmentConfig:
 
     # Networking — default VPC and subnets in eu-west-2 for the data science account
     # If we ever move to a multi-account setup where prod uses a different VPC, override them in prod.py
-    vpc_id: str = "vpc-0f78e906ab4c3cbe1"
+    vpc_id: str = "vpc-b556bedd"
     subnet_ids: list[str] = field(
         default_factory=lambda: [
             "subnet-5cc6e511",
@@ -44,7 +44,6 @@ class EnvironmentConfig:
     # ECS task sizing
     task_cpu: int = 256  # CPU units (256 = 0.25 vCPU)
     task_memory: int = 512  # Memory in MB
-    log_retention_days: int = 30
 
     # =================================================================
     # Derived properties
