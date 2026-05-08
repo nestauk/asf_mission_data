@@ -161,7 +161,7 @@ class CoreStack(Stack):
         self.github_actions_role.add_to_policy(
             iam.PolicyStatement(
                 sid="CloudformationValidation",
-                actions=["ecr:GetAuthorizationToken"],
+                actions=["cloudformation:ValidateTemplate"],
                 resources=["*"],
             )
         )
