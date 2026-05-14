@@ -30,6 +30,16 @@ class EnvironmentConfig:
 
     ecr_max_image_count: int = 10  # Max number of images to keep in ECR repositories
 
+    # Networking (pre-existing VPC resources in eu-west-2)
+    vpc_id: str = "vpc-b556bedd"
+    subnet_ids: list[str] = field(
+        default_factory=lambda: [
+            "subnet-5cc6e511",
+            "subnet-eb6fcb82",
+            "subnet-1de6f466",
+        ]
+    )
+
     # =================================================================
     # Derived properties
     # =================================================================
