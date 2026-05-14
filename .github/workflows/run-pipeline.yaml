@@ -32,7 +32,7 @@ env:
   ECS_TASK_FAMILY: asf-mission-data-dev
   ECS_CAPACITY_PROVIDER: FARGATE
   ECS_SUBNETS: "subnet-5cc6e511,subnet-eb6fcb82,subnet-1de6f466"
-  ECS_SECURITY_GROUPS: "sg-0297c57425412529d"
+  ECS_SECURITY_GROUPS: "sg-0539fd44b1f27895b"
 
 jobs:
   trigger:

@@ -18,7 +18,6 @@ from botocore.exceptions import BotoCoreError, ClientError
 CLUSTER = os.environ.get("ECS_CLUSTER", "asf-mission-data-dev")
 TASK_FAMILY = os.environ.get("ECS_TASK_FAMILY", "asf-mission-data-dev")
 SUBNET_IDS = os.environ.get("ECS_SUBNETS", "subnet-5cc6e511,subnet-eb6fcb82,subnet-1de6f466").split(",")
-SECURITY_GROUP_IDS = os.environ.get("ECS_SECURITY_GROUPS", "sg-0df80dcbbc597eabb").split(",")
 AWS_REGION = os.environ.get("AWS_REGION", "eu-west-2")
 
 
@@ -41,6 +40,14 @@ def emit_github_actions_annotation(level: str, message: str) -> None:
         return
 
     print(f"::{level}::{escape_github_actions_value(message)}")
+
+
+def get_security_group_ids() -> list[str]:
+    raw_value = os.environ.get("ECS_SECURITY_GROUPS")
+    if not raw_value:
+        raise ValueError("ECS_SECURITY_GROUPS environment variable is required")
+
+    return raw_value.split(",")
 
 
 def parse_args() -> argparse.Namespace:
@@ -163,7 +170,7 @@ def run_task(pipeline: str, stage: str, capacity_provider: str, task_definition:
         "networkConfiguration": {
             "awsvpcConfiguration": {
                 "subnets": SUBNET_IDS,
-                "securityGroups": SECURITY_GROUP_IDS,
+                "securityGroups": get_security_group_ids(),
                 "assignPublicIp": "ENABLED",
             }
         },

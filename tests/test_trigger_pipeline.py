@@ -60,9 +60,21 @@ def test_emit_github_actions_annotation_is_noop_when_disabled(
     assert captured.out == ""
 
 
+def test_get_security_group_ids_raises_when_env_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("ECS_SECURITY_GROUPS", raising=False)
+
+    with pytest.raises(ValueError, match="ECS_SECURITY_GROUPS environment variable is required"):
+        trigger_pipeline.get_security_group_ids()
+
+
 def test_run_task_uses_explicit_capacity_provider(
+    monkeypatch: pytest.MonkeyPatch,
     mocker: pytest_mock.MockerFixture,
 ) -> None:
+    monkeypatch.setenv("ECS_SECURITY_GROUPS", "sg-0539fd44b1f27895b")
+
     ecs_client = mocker.Mock()
     ecs_client.run_task.return_value = {
         "tasks": [{"taskArn": "arn:aws:ecs:eu-west-2:123456789012:task/asf-mission-data-dev/task-123"}],
@@ -216,7 +228,7 @@ def test_resolve_task_definition_raises_for_missing_image_tag(mocker) -> None:
 
     mocker.patch("scripts.trigger_pipeline.boto3.client", side_effect=boto3_client)
 
-    with pytest.raises(ValueError, match="Image tag '44-feat-image' was not found"):
+    with pytest.raises(ValueError, match="Could not find the image tag '44-feat-image'"):
         trigger_pipeline.resolve_task_definition("44-feat-image")
 
     ecs_client.register_task_definition.assert_not_called()
