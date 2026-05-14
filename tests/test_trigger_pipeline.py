@@ -216,7 +216,7 @@ def test_resolve_task_definition_raises_for_missing_image_tag(mocker) -> None:
 
     mocker.patch("scripts.trigger_pipeline.boto3.client", side_effect=boto3_client)
 
-    with pytest.raises(ValueError, match="Image tag '44-feat-image' was not found"):
+    with pytest.raises(ValueError, match="Could not find the image tag '44-feat-image'"):
         trigger_pipeline.resolve_task_definition("44-feat-image")
 
     ecs_client.register_task_definition.assert_not_called()
