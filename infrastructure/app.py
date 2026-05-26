@@ -21,7 +21,6 @@ import aws_cdk as cdk
 from config.dev import DEV_CONFIG
 from config.prod import PROD_CONFIG
 from stacks.core import CoreStack
-from stacks.ecs import EcsStack
 
 ENVIRONMENTS = {
     "dev": DEV_CONFIG,
@@ -48,23 +47,9 @@ def create_stacks(app: cdk.App, env_name: str) -> None:
         env=aws_env,
         description=f"ASF Policy Dashboard - Core Infrastructure ({env_name})",
     )
-    # =================================================================
-    # ECS Compute Stack (ECS Cluster, Task Definition, Permissions)
-    # =================================================================
-    ecs = EcsStack(
-        app,
-        f"asf-ecs-{env_name}",
-        config=config,
-        data_bucket=core.data_bucket,
-        ecr_repo=core.ecr_repo,
-        env=aws_env,
-        description=f"ASF Policy Dashboard - ECS Compute ({env_name})",
-    )
-
-    # Apply tags to all resources in both stacks
-    for stack in [core, ecs]:
-        for key, value in config.tags.items():
-            cdk.Tags.of(stack).add(key, value)
+    # Apply tags to all resources
+    for key, value in config.tags.items():
+        cdk.Tags.of(core).add(key, value)
 
 
 # =================================================================
