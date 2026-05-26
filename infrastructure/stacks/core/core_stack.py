@@ -121,15 +121,6 @@ class CoreStack(Stack):
         # -----------------------------------------------------------------
         self.ecr_repo.grant_pull_push(self.github_actions_role)
 
-        # ECR auth token (needed for docker login)
-        self.github_actions_role.add_to_policy(
-            iam.PolicyStatement(
-                sid="ECRAuth",
-                actions=["ecr:GetAuthorizationToken"],
-                resources=["*"],
-            )
-        )
-
         # ECR describe (needed for CI/CD checks)
         self.github_actions_role.add_to_policy(
             iam.PolicyStatement(

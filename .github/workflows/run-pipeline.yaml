@@ -26,6 +26,7 @@ on:
 # Passes the infra values through to trigger_pipeline.py.
 # For now its just dev but when we are out of POC and using
 # prod we can make this a matrix (or add a separate workflow possibly)
+# REPLACE SECURITY GROUPS IF YOU TEAR DOWN THE STACK
 env:
   AWS_REGION: eu-west-2
   ECS_CLUSTER: asf-mission-data-dev
