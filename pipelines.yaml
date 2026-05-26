@@ -10,6 +10,6 @@ pipelines:
     owner: alexandra
     schedule: never  # Template only, not scheduled
     description: Example pipeline demonstrating conventions
-    source_url: n/a
+    source_url: https://www.gov.uk/bank-holidays.json
     stages: [bronze, silver]
-    stack_name: n/a
+    stack_name: tbc

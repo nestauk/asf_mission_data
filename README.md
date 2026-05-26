@@ -23,17 +23,18 @@ uv sync
 source .venv/bin/activate
 
 # Or run commands directly without activating
-uv run python -m asf_mission_data.pipeline.example.handler
+uv run python -m asf_mission_data.run example --stage all
 ```
 
 ### Running pipelines locally
 
 ```bash
-# Set local data root (pipelines will read/write here instead of S3)
+# Set local mode (otherwise the default is the dev S3 bucket)
+export DATA_MODE=LOCAL
 export DATA_ROOT=/tmp/pipeline-dev
 
 # Run the example pipeline
-uv run python -m asf_mission_data.pipeline.example.handler
+uv run python -m asf_mission_data.run example --stage all
 
 # Check output
 ls /tmp/pipeline-dev/
@@ -44,8 +45,10 @@ Or use the `.env.example` file:
 ```bash
 cp .env.example .env
 source .env
-uv run python -m asf_mission_data.pipeline.example.handler
+uv run python -m asf_mission_data.run example --stage all
 ```
+
+For the full local-vs-AWS workflow, see [docs/running-pipelines.md](docs/running-pipelines.md).
 
 ## Developer setup
 
@@ -112,17 +115,93 @@ asf_mission_data/           # Python package (pipeline code)
 ├── alerting.py             # Slack alerting utilities
 └── pipeline/               # Pipeline implementations
     └── example/            # Template pipeline
-infrastructure/             # CloudFormation templates
-├── core/                   # Shared resources (S3, IAM)
-└── pipeline/               # Per-pipeline template
+infrastructure/             # CDK infrastructure
+├── app.py                  # CDK entry point
+├── cdk.json                # CDK configuration
+├── config/                 # Environment configurations
+│   ├── environments.py     # EnvironmentConfig dataclass
+│   ├── dev.py              # Dev environment values
+│   └── prod.py             # Prod environment values
+└── stacks/                 # CDK stacks
+    └── core_stack.py       # Shared resources (S3, ECR, IAM)
 tests/                      # Test suite
 docs/                       # Documentation and runbooks
 scripts/                    # Utility scripts
 ```
 
+## Infrastructure
+
+Infrastructure is managed with [AWS CDK](https://aws.amazon.com/cdk/) (Python).
+
+### Core resources (deployed)
+
+| Resource | Dev | Prod |
+|----------|-----|------|
+| S3 bucket | `asf-mission-data-dev` | `asf-mission-data-prod` |
+| ECR repository | `asf-mission-data` | `asf-mission-data` |
+| GitHub Actions IAM role | `asf-github-actions-dev` | `asf-github-actions-prod` |
+
+### Deploying infrastructure
+
+```bash
+# Install CDK dependencies
+uv sync --extra infrastructure
+npm install -g aws-cdk
+
+# Deploy to dev
+cd infrastructure
+cdk deploy --context env=dev
+
+# Preview changes
+cdk diff --context env=dev
+```
+
+See [infrastructure/README.md](infrastructure/README.md) for full documentation.
+
 ## Creating a new pipeline
 
 *(TODO: Document after Hamilton spike — see docs/creating-a-pipeline.md)*
+
+## Testing pipelines
+
+For new bronze/silver pipelines in this repo, the recommended baseline is:
+
+- keep bronze tests focused on fetching and storing raw data correctly
+- keep silver tests focused on transformation logic and data contracts
+- add one local integration test that proves the real pipeline wiring works end to end without using S3
+
+The example pipeline includes a complete test template:
+
+- `tests/pipeline/example/test_bronze.py` shows how to mock an external source and assert the raw file plus metadata are written correctly
+- `tests/pipeline/example/test_silver.py` shows how to test silver transform functions, validate a dataframe schema, and run a local integration test against a temporary directory
+- `tests/pipeline/example/conftest.py` shows how to share sample input data and set `DATA_MODE=LOCAL` for tests
+
+When adding a new pipeline, aim to include at least:
+
+1. one bronze unit test that mocks the upstream fetch
+2. one bronze persistence test that checks the expected file and metadata paths
+3. unit tests for each non-trivial silver transform
+4. one schema or contract test that rejects invalid data
+5. one local integration test that runs the real pipeline against `tmp_path`
+
+This split matters because different failures happen in different places:
+
+- bronze tests catch broken downloads, missing metadata, and incorrect storage paths
+- silver unit tests catch parsing and transformation bugs
+- schema tests catch subtle bad data before it reaches the canonical output
+- integration tests catch wiring mistakes between storage, Hamilton, and parquet writes
+
+Run just the example pipeline tests with:
+
+```bash
+uv run pytest tests/pipeline/example
+```
+
+Run the full suite with:
+
+```bash
+uv run pytest
+```
 
 ## Pipeline registry
 
@@ -130,8 +209,34 @@ All pipelines are registered in `pipelines.yaml`. Update this file when adding a
 
 ## Deployment
 
-*(TODO: Document CI/CD workflow)*
+For the supported ways to build images and run pipelines in AWS, see [docs/running-pipelines.md](docs/running-pipelines.md).
+
+## Docker
+
+Build the image with a canonical tag:
+
+```bash
+docker build -t asf-mission-data .
+```
+
+Run a pipeline in a local filesystem-backed mode:
+
+```bash
+mkdir -p /tmp/asf-mission-data
+
+docker run --rm \
+  -e DATA_MODE=LOCAL \
+  -e DATA_ROOT=/tmp/asf-mission-data \
+  -v /tmp/asf-mission-data:/tmp/asf-mission-data \
+  asf-mission-data \
+  example --stage all
+```
+
+Notes:
+
+- The image tag above is `asf-mission-data`, not `asf_mission_data`.
+- If you omit `DATA_MODE`/`DATA_ROOT`, the container defaults to the dev S3 location and expects the corresponding AWS runtime configuration.
 
 ## Runbook
 
-*(TODO: Agree on doc strategy)*
+Start with [docs/running-pipelines.md](docs/running-pipelines.md) for the standard local, GitHub UI, and ad hoc AWS run paths.
