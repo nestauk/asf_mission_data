@@ -1,4 +1,4 @@
-name: Run pipeline
+name: Test pipeline (dev)
 
 on:
   workflow_dispatch:
