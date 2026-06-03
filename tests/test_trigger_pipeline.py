@@ -10,6 +10,7 @@ def test_parse_args_defaults_to_standard_fargate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("ECS_CAPACITY_PROVIDER", raising=False)
+    monkeypatch.delenv("ASF_ENVIRONMENT", raising=False)
     monkeypatch.setattr(
         "sys.argv",
         ["trigger_pipeline.py", "example", "--stage", "silver"],
@@ -21,6 +22,7 @@ def test_parse_args_defaults_to_standard_fargate(
     assert args.pipeline == "example"
     assert args.stage == "silver"
     assert args.capacity_provider == "FARGATE"
+    assert args.environment == "dev"
     assert args.image_tag == "dev-latest"
 
 
@@ -60,21 +62,17 @@ def test_emit_github_actions_annotation_is_noop_when_disabled(
     assert captured.out == ""
 
 
-def test_get_security_group_ids_raises_when_env_missing(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.delenv("ECS_SECURITY_GROUPS", raising=False)
-
-    with pytest.raises(ValueError, match="ECS_SECURITY_GROUPS environment variable is required"):
-        trigger_pipeline.get_security_group_ids()
+FAKE_INFRA = trigger_pipeline.InfraConfig(
+    cluster="arn:aws:ecs:eu-west-2:123456789012:cluster/asf-mission-data-dev",
+    task_family="asf-mission-data-dev",
+    subnet_ids=["subnet-abc", "subnet-def"],
+    security_group_ids=["sg-0539fd44b1f27895b"],
+)
 
 
 def test_run_task_uses_explicit_capacity_provider(
-    monkeypatch: pytest.MonkeyPatch,
     mocker: pytest_mock.MockerFixture,
 ) -> None:
-    monkeypatch.setenv("ECS_SECURITY_GROUPS", "sg-0539fd44b1f27895b")
-
     ecs_client = mocker.Mock()
     ecs_client.run_task.return_value = {
         "tasks": [{"taskArn": "arn:aws:ecs:eu-west-2:123456789012:task/asf-mission-data-dev/task-123"}],
@@ -82,7 +80,7 @@ def test_run_task_uses_explicit_capacity_provider(
     }
     boto_client = mocker.patch("scripts.trigger_pipeline.boto3.client", return_value=ecs_client)
 
-    trigger_pipeline.run_task("example", "all", "FARGATE", "asf-mission-data-dev")
+    trigger_pipeline.run_task("example", "all", "FARGATE", "asf-mission-data-dev", FAKE_INFRA)
 
     boto_client.assert_called_once_with("ecs", region_name=trigger_pipeline.AWS_REGION)
     ecs_client.run_task.assert_called_once()
@@ -113,14 +111,14 @@ def test_resolve_task_definition_returns_task_family_for_dev_latest(mocker):
     }
     boto_client = mocker.patch("scripts.trigger_pipeline.boto3.client", return_value=ecs_client)
 
-    result = trigger_pipeline.resolve_task_definition("dev-latest")
+    result = trigger_pipeline.resolve_task_definition("dev-latest", FAKE_INFRA, "dev")
 
     assert result == trigger_pipeline.ResolvedTaskDefinition(
         task_definition="arn:aws:ecs:eu-west-2:123:task-definition/asf-mission-data-dev:6",
         app_image="123.dkr.ecr.eu-west-2.amazonaws.com/asf-mission-data:dev-latest",
     )
     boto_client.assert_called_once_with("ecs", region_name=trigger_pipeline.AWS_REGION)
-    ecs_client.describe_task_definition.assert_called_once_with(taskDefinition=trigger_pipeline.TASK_FAMILY)
+    ecs_client.describe_task_definition.assert_called_once_with(taskDefinition=FAKE_INFRA.task_family)
 
 
 def test_resolve_task_definition_registers_new_revision_for_feature_tag(
@@ -163,7 +161,7 @@ def test_resolve_task_definition_registers_new_revision_for_feature_tag(
 
     mocker.patch("scripts.trigger_pipeline.boto3.client", side_effect=boto3_client)
 
-    result = trigger_pipeline.resolve_task_definition("56-feature-new-pipeline-latest")
+    result = trigger_pipeline.resolve_task_definition("56-feature-new-pipeline-latest", FAKE_INFRA, "dev")
 
     # correct image was registered
     registered_containers = ecs_client.register_task_definition.call_args.kwargs["containerDefinitions"]
@@ -179,12 +177,22 @@ def test_resolve_task_definition_registers_new_revision_for_feature_tag(
     )
 
 
-def test_parse_args_reads_image_tag_from_env(monkeypatch):
+def test_parse_args_image_tag_defaults_to_environment(monkeypatch):
     """
-    When IMAGE_TAG env var is set, parse_args picks it up as the default
+    When no --image-tag is given, it defaults to {environment}-latest
     """
-    monkeypatch.setenv("IMAGE_TAG", "56-feature-new-pipeline-latest")
-    monkeypatch.setattr("sys.argv", ["trigger_pipeline.py", "example"])
+    monkeypatch.setattr("sys.argv", ["trigger_pipeline.py", "example", "--environment", "prod"])
+
+    args = trigger_pipeline.parse_args()
+
+    assert args.image_tag == "prod-latest"
+
+
+def test_parse_args_image_tag_override(monkeypatch):
+    """
+    When --image-tag is given explicitly, it overrides the default
+    """
+    monkeypatch.setattr("sys.argv", ["trigger_pipeline.py", "example", "--image-tag", "56-feature-new-pipeline-latest"])
 
     args = trigger_pipeline.parse_args()
 
@@ -229,6 +237,6 @@ def test_resolve_task_definition_raises_for_missing_image_tag(mocker) -> None:
     mocker.patch("scripts.trigger_pipeline.boto3.client", side_effect=boto3_client)
 
     with pytest.raises(ValueError, match="Could not find the image tag '44-feat-image'"):
-        trigger_pipeline.resolve_task_definition("44-feat-image")
+        trigger_pipeline.resolve_task_definition("44-feat-image", FAKE_INFRA, "dev")
 
     ecs_client.register_task_definition.assert_not_called()

@@ -1,0 +1,59 @@
+# Promotes the tested dev image to production by re-tagging it in ECR.
+#
+# This runs automatically when a PR from dev is merged into the prod branch.
+# It does NOT rebuild the Docker image — it takes the exact image that was
+# tested in dev and tags it as prod-latest, so what you tested is what runs.
+#
+# No pipelines are triggered by this workflow. Pipelines run either on
+# schedule (EventBridge) or manually via the "Run pipeline (prod)" workflow.
+
+name: Promote dev to prod
+
+on:
+  push:
+    branches:
+      - prod
+
+env:
+  AWS_REGION: eu-west-2
+  ECR_REPO: asf-mission-data
+
+jobs:
+    promote:
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        permissions:
+          contents: read
+          id-token: write # Required for OIDC authentication with AWS
+
+        steps:
+            - name: Configure AWS credentials
+              uses: aws-actions/configure-aws-credentials@v6
+              with:
+                role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/asf-github-actions-prod
+                aws-region: ${{ env.AWS_REGION }}
+                role-session-name: GitHubActions-Promote-${{ github.run_id }}
+
+            # Re-tag rather than rebuild: fetch the dev-latest manifest from ECR
+            # and push it back with the prod-latest tag. No Docker needed.
+            - name: Re-tag dev-latest as prod-latest
+              run: |
+                MANIFEST=$(aws ecr batch-get-image \
+                    --repository-name ${{ env.ECR_REPO }} \
+                    --image-ids imageTag=dev-latest \
+                    --query 'images[0].imageManifest' \
+                    --output text)
+
+                if [ "$MANIFEST" = "None" ] || [ -z "$MANIFEST" ]; then
+                    echo "::error::No dev-latest image found in ECR"
+                    exit 1
+                fi
+
+                aws ecr put-image \
+                    --repository-name ${{ env.ECR_REPO }} \
+                    --image-tag prod-latest \
+                    --image-manifest "$MANIFEST"
+
+            - name: Summary
+              run: |
+                echo "### Promoted dev-latest → prod-latest" >> $GITHUB_STEP_SUMMARY
