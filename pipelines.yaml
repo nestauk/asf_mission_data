@@ -17,6 +17,6 @@ pipelines:
     owner: Elysia
     schedule:  TBC
     description: Ofgem energy price cap Annex 9 Final levelised cap rates model data
-    sourve_url: https://www.ofgem.gov.uk/energy-regulation/domestic-and-non-domestic/energy-pricing-rules/energy-price-cap/energy-price-cap-default-tariff-levels
-    stages: [bronze, silver]
+    source_url: https://www.ofgem.gov.uk/energy-regulation/domestic-and-non-domestic/energy-pricing-rules/energy-price-cap/energy-price-cap-default-tariff-levels
+    stages: [bronze, silver, gold]
     stack_name: TBC

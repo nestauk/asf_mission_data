@@ -37,7 +37,7 @@ def silver_df(silver_energy_price_cap_annex_9_dataset: str) -> pd.DataFrame:
 
 def latest_price_cap_period(silver_df: pd.DataFrame) -> str:
     """Latest price cap period from the silver DataFrame metadata."""
-    metadata_dict = silver_df["metadata"][0]
+    metadata_dict = silver_df["metadata"].iloc[0]
     return metadata_dict.get("price_cap_period")
 
 
@@ -85,7 +85,7 @@ def consumption_adjusted_levels_with_vat_df(silver_df: pd.DataFrame) -> pd.DataF
         "value",
     ] *= 1 + vat
 
-    # Remove now redundant "Total inc VAT" rows for Dual fuel
+    # Remove now redundant "Total inc VAT" rows that were present only in the Dual fuel table
     uprated_silver_df = uprated_silver_df[uprated_silver_df["Tariff component"] != "Total inc VAT"]
 
     return pd.concat([uprated_silver_df, vat_rows], ignore_index=True)
@@ -196,8 +196,8 @@ def tariff_component_rates_df(consumption_adjusted_levels_with_vat_df: pd.DataFr
 
         melted = (
             pivoted.assign(
-                standing_charge=pivoted["Nil consumption"] * 100 / 365,
-                unit_price=((pivoted["Typical consumption"] - pivoted["Nil consumption"].fillna(0)) / benchmark) * 0.1,
+                standing_charge=pivoted["Nil consumption"] * 100 / 365,  # £/year to p/day
+                unit_price=((pivoted["Typical consumption"] - pivoted["Nil consumption"].fillna(0)) / benchmark) * 0.1,  # £/MWh to p/kWh
             )
             .drop(columns=["Nil consumption", "Typical consumption"])
             .fillna({"standing_charge": 0, "unit_price": 0})
