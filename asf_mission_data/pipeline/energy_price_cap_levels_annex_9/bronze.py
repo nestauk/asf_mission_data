@@ -1,5 +1,6 @@
 """Hamilton nodes for bronze-layer of the Energy Price Cap Levels Annex 9 pipeline"""
 
+import logging
 import re
 from pathlib import Path
 from urllib.parse import urljoin
@@ -8,14 +9,16 @@ from bs4 import BeautifulSoup
 from hamilton.function_modifiers import check_output_custom
 
 from asf_mission_data import storage, utils
-from asf_mission_data.logging_utils import setup_logging
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import (
     PRICE_CAP_PERIOD_PUBLICATION_DATES,
     PRICE_CAP_PERIOD_STRING_PATTERN,
 )
-from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.validators import LatestPriceCapFileUrlValidator, LatestPriceCapValidator
+from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.validators import (
+    LatestPriceCapFileUrlValidator,
+    LatestPriceCapValidator,
+)
 
-logger = setup_logging(__name__)
+logger = logging.getLogger(__name__)
 
 
 def latest_collection_page_html_soup(collection_url: str) -> BeautifulSoup:
@@ -43,7 +46,9 @@ def latest_file_url(
 
 
 @check_output_custom(LatestPriceCapValidator(PRICE_CAP_PERIOD_PUBLICATION_DATES))
-def latest_price_cap_period(latest_collection_page_html_soup: BeautifulSoup) -> str:
+def latest_price_cap_period(
+    latest_collection_page_html_soup: BeautifulSoup,
+) -> str:
     """Extract the latest energy price cap period from given collection page.
 
     Searches all <h2> and <h3> headings in the given BeautifulSoup object for

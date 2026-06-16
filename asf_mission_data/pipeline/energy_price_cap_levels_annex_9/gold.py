@@ -9,14 +9,19 @@ from hamilton.function_modifiers import (
 )
 
 from asf_mission_data import storage, utils
-from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import BENCHMARK_CONSUMPTION, COMPONENT_CATEGORY_MAP
+from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import (
+    BENCHMARK_CONSUMPTION,
+    COMPONENT_CATEGORY_MAP,
+)
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.schemas import (
     GOLD_1C_CONSUMPTION_ADJUSTED_LEVELS_WITH_VAT_SCHEMA,
     GOLD_ANNUAL_BILL_FIXED_AND_VARIABLE_COMPONENT_CONTRIBUTIONS_SCHEMA,
     GOLD_PRICE_RATIOS_SCHEMA,
     GOLD_TARIFF_COMPONENT_RATES_SCHEMA,
 )
-from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.validators import TariffComponentsTotalValidator
+from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.validators import (
+    TariffComponentsTotalValidator,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -49,10 +54,17 @@ def latest_price_cap_period(silver_df: pd.DataFrame) -> str:
 @check_output_custom(
     TariffComponentsTotalValidator(
         value_col="value",
-        group_cols=["Consumption", "Fuel", "Payment method", "28AD Charge Restriction Period start"],
+        group_cols=[
+            "Consumption",
+            "Fuel",
+            "Payment method",
+            "28AD Charge Restriction Period start",
+        ],
     )
 )
-def consumption_adjusted_levels_with_vat_df(silver_df: pd.DataFrame) -> pd.DataFrame:
+def consumption_adjusted_levels_with_vat_df(
+    silver_df: pd.DataFrame,
+) -> pd.DataFrame:
     """Add VAT as a tariff component and uprate the total values to include VAT.
 
     This function derives VAT-inclusive tariff values from the silver dataset, and
@@ -91,9 +103,13 @@ def consumption_adjusted_levels_with_vat_df(silver_df: pd.DataFrame) -> pd.DataF
     return pd.concat([uprated_silver_df, vat_rows], ignore_index=True)
 
 
-@check_output(schema=GOLD_1C_CONSUMPTION_ADJUSTED_LEVELS_WITH_VAT_SCHEMA, importance="fail")
+@check_output(
+    schema=GOLD_1C_CONSUMPTION_ADJUSTED_LEVELS_WITH_VAT_SCHEMA,
+    importance="fail",
+)
 def gold_1c_consumption_adjusted_levels_with_vat_df(
-    consumption_adjusted_levels_with_vat_df: pd.DataFrame, silver_df: pd.DataFrame
+    consumption_adjusted_levels_with_vat_df: pd.DataFrame,
+    silver_df: pd.DataFrame,
 ) -> pd.DataFrame:
     """Create the gold-layer dataset for consumption-adjusted tariff levels including VAT.
 
@@ -122,7 +138,9 @@ def gold_1c_consumption_adjusted_levels_with_vat_df(
 
 
 def gold_1c_consumption_adjusted_levels_with_vat_parquet(
-    gold_1c_consumption_adjusted_levels_with_vat_df: pd.DataFrame, dataset_prefix: str, latest_price_cap_period: str
+    gold_1c_consumption_adjusted_levels_with_vat_df: pd.DataFrame,
+    dataset_prefix: str,
+    latest_price_cap_period: str,
 ) -> None:
     """Persist the gold-layer consumption-adjusted tariff levels with VAT as a parquet file."""
     storage.ingest_to_gold(
@@ -141,10 +159,17 @@ def gold_1c_consumption_adjusted_levels_with_vat_parquet(
 @check_output_custom(
     TariffComponentsTotalValidator(
         value_col="value",
-        group_cols=["Fuel", "Payment method", "28AD Charge Restriction Period start", "Type"],
+        group_cols=[
+            "Fuel",
+            "Payment method",
+            "28AD Charge Restriction Period start",
+            "Type",
+        ],
     )
 )
-def tariff_component_rates_df(consumption_adjusted_levels_with_vat_df: pd.DataFrame) -> pd.DataFrame:
+def tariff_component_rates_df(
+    consumption_adjusted_levels_with_vat_df: pd.DataFrame,
+) -> pd.DataFrame:
     """Calculate standing charges and unit rates for tariff components.
 
     The input dataset contains VAT-adjusted annual tariff component values for
@@ -250,7 +275,11 @@ def gold_tariff_component_rates_df(
     return df
 
 
-def gold_tariff_component_rates_parquet(gold_tariff_component_rates_df: pd.DataFrame, dataset_prefix: str, latest_price_cap_period: str) -> None:
+def gold_tariff_component_rates_parquet(
+    gold_tariff_component_rates_df: pd.DataFrame,
+    dataset_prefix: str,
+    latest_price_cap_period: str,
+) -> None:
     """Persist the gold-layer standing charge and unit rates for each component
     as a parquet file."""
     storage.ingest_to_gold(
@@ -266,7 +295,9 @@ def gold_tariff_component_rates_parquet(gold_tariff_component_rates_df: pd.DataF
 # -------------------------------------------------------------
 
 
-def total_unit_rates_df(tariff_component_rates_df: pd.DataFrame) -> pd.DataFrame:
+def total_unit_rates_df(
+    tariff_component_rates_df: pd.DataFrame,
+) -> pd.DataFrame:
     """Extract total unit prices for gas and electricity and reshape them for comparison.
 
     This function filters the tariff component rates to retain only the
@@ -350,7 +381,11 @@ def gold_price_ratios_df(total_unit_rates_df: pd.DataFrame, silver_df: pd.DataFr
     return df.reset_index(drop=True)
 
 
-def gold_price_ratios_parquet(gold_price_ratios_df: pd.DataFrame, dataset_prefix: str, latest_price_cap_period: str) -> None:
+def gold_price_ratios_parquet(
+    gold_price_ratios_df: pd.DataFrame,
+    dataset_prefix: str,
+    latest_price_cap_period: str,
+) -> None:
     """Persist the gold-layer dataset for electricity-to-gas price ratios as a parquet file."""
     storage.ingest_to_gold(
         dataset_prefix=dataset_prefix,
@@ -368,10 +403,17 @@ def gold_price_ratios_parquet(gold_price_ratios_df: pd.DataFrame, dataset_prefix
 @check_output_custom(
     TariffComponentsTotalValidator(
         value_col="value",
-        group_cols=["Fuel", "Payment method", "28AD Charge Restriction Period start", "Type"],
+        group_cols=[
+            "Fuel",
+            "Payment method",
+            "28AD Charge Restriction Period start",
+            "Type",
+        ],
     )
 )
-def annual_bill_fixed_and_variable_contributions_df(consumption_adjusted_levels_with_vat_df: pd.DataFrame) -> pd.DataFrame:
+def annual_bill_fixed_and_variable_contributions_df(
+    consumption_adjusted_levels_with_vat_df: pd.DataFrame,
+) -> pd.DataFrame:
     """Derive annual fixed and variable bill contributions for tariff components.
 
     The input dataset contains VAT-adjusted annual tariff component values for
@@ -450,9 +492,13 @@ def annual_bill_fixed_and_variable_contributions_df(consumption_adjusted_levels_
     return pd.concat(dfs, ignore_index=True)
 
 
-@check_output(schema=GOLD_ANNUAL_BILL_FIXED_AND_VARIABLE_COMPONENT_CONTRIBUTIONS_SCHEMA, importance="fail")
+@check_output(
+    schema=GOLD_ANNUAL_BILL_FIXED_AND_VARIABLE_COMPONENT_CONTRIBUTIONS_SCHEMA,
+    importance="fail",
+)
 def gold_annual_bill_fixed_and_variable_component_contributions_df(
-    annual_bill_fixed_and_variable_contributions_df: pd.DataFrame, silver_df: pd.DataFrame
+    annual_bill_fixed_and_variable_contributions_df: pd.DataFrame,
+    silver_df: pd.DataFrame,
 ) -> pd.DataFrame:
     """Create the gold dataset for annual bill fixed and variable cost contributions.
 
@@ -482,7 +528,9 @@ def gold_annual_bill_fixed_and_variable_component_contributions_df(
 
 
 def gold_annual_bill_fixed_and_variable_component_contributions_parquet(
-    gold_annual_bill_fixed_and_variable_component_contributions_df: pd.DataFrame, dataset_prefix: str, latest_price_cap_period: str
+    gold_annual_bill_fixed_and_variable_component_contributions_df: pd.DataFrame,
+    dataset_prefix: str,
+    latest_price_cap_period: str,
 ) -> None:
     """Persist the gold-layer dataset for gas and electricity unit prices, electricity-to-gas price ratios
     as a parquet file."""

@@ -2,14 +2,18 @@
 Main functions that orchestrate the execution of the pipeline stages for Energy Price Cap Levels Annex 9.
 """
 
+import logging
 from datetime import datetime, timezone
 from importlib.metadata import version
 
 from hamilton import driver
 
 from asf_mission_data import storage, utils
-from asf_mission_data.logging_utils import setup_logging
-from asf_mission_data.pipeline.energy_price_cap_levels_annex_9 import bronze, gold, silver
+from asf_mission_data.pipeline.energy_price_cap_levels_annex_9 import (
+    bronze,
+    gold,
+    silver,
+)
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import (
     COLLECTION_URL,
     DATASET_PREFIX,
@@ -19,7 +23,7 @@ from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import (
     SILVER_TABLES_NODES_MAP,
 )
 
-logger = setup_logging(__name__)
+logger = logging.getLogger(__name__)
 
 
 def build_bronze_driver() -> driver.Driver:
@@ -116,7 +120,17 @@ def build_gold_driver(silver_table_prefix: str) -> driver.Driver:
     """Construct a general Hamilton driver configured to execute gold layer DAGs from a specified silver table in
     the Energy Price Cap Annex 9 pipeline.
     """
-    dr = driver.Builder().with_modules(gold).with_config({"dataset_prefix": DATASET_PREFIX, "silver_table_prefix": silver_table_prefix}).build()
+    dr = (
+        driver.Builder()
+        .with_modules(gold)
+        .with_config(
+            {
+                "dataset_prefix": DATASET_PREFIX,
+                "silver_table_prefix": silver_table_prefix,
+            }
+        )
+        .build()
+    )
     return dr
 
 

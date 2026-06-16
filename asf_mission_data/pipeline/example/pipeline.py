@@ -5,16 +5,16 @@ that orchestrates the execution of the
 pipeline stages.
 """
 
+import logging
 from datetime import datetime, timezone
 
 from hamilton import driver
 
-from asf_mission_data.logging_utils import setup_logging
 from asf_mission_data.pipeline.example import silver
 from asf_mission_data.pipeline.example.bronze import SOURCE_URL, fetch_raw_data
 from asf_mission_data.storage import ingest_to_bronze
 
-logger = setup_logging(__name__)
+logger = logging.getLogger(__name__)
 
 DATASET_PREFIX = "example"
 
