@@ -8,7 +8,7 @@ DEFAULT_LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s - %(message)s"
 
 
 def configure_logging(
-    log_leve: str = "INFO",
+    log_level: str = "INFO",
     log_format: str = DEFAULT_LOG_FORMAT,
 ) -> None:
     """Set up logging for the entire application.
@@ -19,9 +19,9 @@ def configure_logging(
     this code."""
 
     root = logging.getLogger()
-    level = getattr(logging, log_leve.upper(), None)
+    level = getattr(logging, log_level.upper(), None)
     if not isinstance(level, int):
-        raise ValueError(f"Invalid log level: {log_leve}")
+        raise ValueError(f"Invalid log level: {log_level}")
 
     root.setLevel(level)
     root.handlers.clear()
@@ -34,5 +34,8 @@ def configure_logging(
     # Shut up the noisy third-party libraries
     logging.getLogger("boto3").setLevel(logging.WARNING)
     logging.getLogger("botocore").setLevel(logging.WARNING)
+    logging.getLogger("fsspec").setLevel(logging.WARNING)
+    logging.getLogger("graphviz").setLevel(logging.WARNING)
+    logging.getLogger("hamilton").setLevel(logging.WARNING)
     logging.getLogger("s3fs").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
