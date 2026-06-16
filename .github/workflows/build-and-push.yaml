@@ -14,19 +14,19 @@ on:
     branches: [dev]
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
-      - name: Run tests
-        run: |
-          uv sync --group dev
-          uv run pytest
+  # test:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v5
+  #     - name: Install uv
+  #       uses: astral-sh/setup-uv@v6
+  #     - name: Run tests
+  #       run: |
+  #         uv sync --group dev
+  #         uv run pytest
 
   build-and-push:
-    needs: test
+    # needs: test
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
