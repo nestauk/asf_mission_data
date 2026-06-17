@@ -19,7 +19,7 @@ PRICE_CAP_PERIOD_PUBLICATION_DATES = {
     "1 July to 30 September 2026": "2026-05-27",
     "1 October to 31 December 2026": "2026-08-26",
     "1 January to 31 March 2027": "2026-11-25",
-    "1 April to 30 June 2027": "2027-02-24",
+    "1 April to 30 June 2027": "2027-02-23",
     "1 July to 30 September 2027": "2027-05-26",
     "1 October to 31 December 2027": "2027-08-25",
     "1 January to 31 March 2028": "2027-11-24",
@@ -44,6 +44,8 @@ BENCHMARK_CONSUMPTION = {  # MWh per year
     "Electricity: Single-Rate Metering Arrangement": 2.7,
     "Electricity: Multi-Register Metering Arrangement": 3.9,
 }
+
+VAT = 0.05
 
 COMPONENT_CATEGORY_MAP = {
     "DF": "Wholesale",  # Direct fuel
