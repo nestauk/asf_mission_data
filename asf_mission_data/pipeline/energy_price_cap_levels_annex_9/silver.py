@@ -51,7 +51,10 @@ def latest_price_cap_period(
     bronze_energy_price_cap_annex_9_metadata: dict[str, str],
 ) -> str:
     """Extract the latest price cap period from the bronze metadata."""
-    return bronze_energy_price_cap_annex_9_metadata.get("price_cap_period")
+    period = bronze_energy_price_cap_annex_9_metadata.get("price_cap_period")
+    if not period:
+        raise KeyError("'price_cap_period' missing from bronze metadata.")
+    return period
 
 
 # ----------------------------------
@@ -173,7 +176,9 @@ def raw_payment_method_table_df(excel_sheet_df: pd.DataFrame, payment_method: st
     if header != payment_method:
         raise ValueError(f"Slice Error: Expected header '{payment_method}' at top of dataframe slice, but found '{header}'")
 
-    logger.debug(f"Extracted {payment_method} table: rows {start_index} to {end_index} ({len(df_slice)} rows, {len(df_slice.columns)} columns)")
+    logger.debug(
+        "Extracted %s table: rows %s to %s (%d rows, %d columns)", payment_method, start_index, end_index, len(df_slice), len(df_slice.columns)
+    )
 
     return df_slice
 
@@ -234,8 +239,16 @@ def _get_fuel_columns(forward_filled_columns_payment_method_table_df: pd.DataFra
 
     Returns:
         list[str]: List of column names corresponding to the specified fuel type.
+
+    Raises:
+        ValueError: If no columns are found for the specified fuel type.
     """
-    return forward_filled_columns_payment_method_table_df.columns[(forward_filled_columns_payment_method_table_df == fuel).any(axis=0)].to_list()
+    cols = forward_filled_columns_payment_method_table_df.columns[(forward_filled_columns_payment_method_table_df == fuel).any(axis=0)].to_list()
+
+    if not cols:
+        raise ValueError(f"Could not find columns for fuel '{fuel}'.")
+
+    return cols
 
 
 NIL_DF_MAP = {
@@ -269,12 +282,19 @@ def fuel_nil_consumption_df(
 
     fuel_columns = _get_fuel_columns(forward_filled_columns_payment_method_table_df, fuel)
 
-    start_nil_consumption_index = forward_filled_columns_payment_method_table_df.index[
+    nil_matches = forward_filled_columns_payment_method_table_df.index[
         forward_filled_columns_payment_method_table_df[fuel_columns[0]] == "Nil consumption"
-    ].tolist()[0]
-    start_typical_consumption_index = forward_filled_columns_payment_method_table_df.index[
+    ].tolist()
+    if not nil_matches:
+        raise ValueError(f"Could not find 'Nil consumption' header for fuel '{fuel}'.")
+    start_nil_consumption_index = nil_matches[0]
+
+    typical_matches = forward_filled_columns_payment_method_table_df.index[
         forward_filled_columns_payment_method_table_df[fuel_columns[0]] == "Typical consumption"
-    ].tolist()[0]
+    ].tolist()
+    if not typical_matches:
+        raise ValueError(f"Could not find 'Typical consumption' header for fuel '{fuel}'.")
+    start_typical_consumption_index = typical_matches[0]
 
     fuel_nil_df = (
         forward_filled_columns_payment_method_table_df[fuel_columns]
@@ -324,9 +344,12 @@ def fuel_typical_consumption_df(
 
     fuel_columns = _get_fuel_columns(forward_filled_columns_payment_method_table_df, fuel)
 
-    start_typical_consumption_index = forward_filled_columns_payment_method_table_df.index[
+    typical_matches = forward_filled_columns_payment_method_table_df.index[
         forward_filled_columns_payment_method_table_df[fuel_columns[0]] == "Typical consumption"
-    ].tolist()[0]
+    ].tolist()
+    if not typical_matches:
+        raise ValueError(f"Could not find 'Typical consumption' header for fuel '{fuel}'.")
+    start_typical_consumption_index = typical_matches[0]
 
     fuel_typical_df = (
         forward_filled_columns_payment_method_table_df[fuel_columns].loc[start_typical_consumption_index:, :].reset_index(drop=True)
@@ -440,24 +463,26 @@ def all_tariff_tables_tidy_df(
     Returns:
         pd.DataFrame: Unified tidy DataFrame containing all tariff table entries.
     """
-    all_dfs = [
-        # Other Payment Method
-        electricity_single_rate_other_payment_method_tidy_df,
-        electricity_multi_register_other_payment_method_tidy_df,
-        gas_other_payment_method_tidy_df,
-        dual_fuel_other_payment_method_tidy_df,
-        # Standard Credit
-        electricity_single_rate_standard_credit_tidy_df,
-        electricity_multi_register_standard_credit_tidy_df,
-        gas_standard_credit_tidy_df,
-        dual_fuel_standard_credit_tidy_df,
-        # PPM
-        electricity_single_rate_ppm_tidy_df,
-        electricity_multi_register_ppm_tidy_df,
-        gas_ppm_tidy_df,
-        dual_fuel_ppm_tidy_df,
-    ]
-    return pd.concat(all_dfs, ignore_index=True)
+    all_dfs = {
+        "electricity_single_rate_other_payment_method": electricity_single_rate_other_payment_method_tidy_df,
+        "electricity_multi_register_other_payment_method": electricity_multi_register_other_payment_method_tidy_df,
+        "gas_other_payment_method": gas_other_payment_method_tidy_df,
+        "dual_fuel_other_payment_method": dual_fuel_other_payment_method_tidy_df,
+        "electricity_single_rate_standard_credit": electricity_single_rate_standard_credit_tidy_df,
+        "electricity_multi_register_standard_credit": electricity_multi_register_standard_credit_tidy_df,
+        "gas_standard_credit": gas_standard_credit_tidy_df,
+        "dual_fuel_standard_credit": dual_fuel_standard_credit_tidy_df,
+        "electricity_single_rate_ppm": electricity_single_rate_ppm_tidy_df,
+        "electricity_multi_register_ppm": electricity_multi_register_ppm_tidy_df,
+        "gas_ppm": gas_ppm_tidy_df,
+        "dual_fuel_ppm": dual_fuel_ppm_tidy_df,
+    }
+
+    empty = [name for name, df in all_dfs.items() if df.empty]
+    if empty:
+        raise ValueError(f"Tariff table(s) are empty: {empty}")
+
+    return pd.concat(all_dfs.values(), ignore_index=True)
 
 
 @extract_columns(
@@ -475,10 +500,15 @@ def charge_restriction_period_dates(
 
     Returns:
         pd.DataFrame: DataFrame containing start date, end date, and interval columns.
+
+    Raises:
+        ValueError: If the expected charge restriction period column is missing.
     """
-    intervals = all_tariff_tables_tidy_df["28AD Charge Restriction Period"].apply(
-        utils.convert_energy_price_cap_charge_restriction_period_string_to_interval
-    )
+    col = "28AD Charge Restriction Period"
+    if col not in all_tariff_tables_tidy_df.columns:
+        raise ValueError(f"Expected column '{col}' not found in tariff tables dataframe.")
+
+    intervals = all_tariff_tables_tidy_df[col].apply(utils.convert_energy_price_cap_charge_restriction_period_string_to_interval)
 
     return pd.DataFrame(
         {
@@ -516,7 +546,10 @@ def all_tariff_tables_tidy_with_metadata_df(
 
     df["metadata"] = [silver_energy_price_cap_annex_9_metadata] * len(df)
 
+    # Non-numeric values (e.g. blank cells) are coerced to NaN intentionally;
+    # nullable=True in SILVER_1C_CONSUMPTION_ADJUSTED_LEVELS_SCHEMA allows these through
     df["value"] = pd.to_numeric(df["value"], errors="coerce")
+
     string_cols = [
         "Payment method",
         "Fuel",
@@ -535,7 +568,7 @@ def silver_energy_price_cap_annex_9_1c_consumption_adjusted_levels_parquet(
     dataset_prefix: str,
     latest_price_cap_period: str,
     sheet_name: str,
-) -> str:
+) -> None:
     """Persist the silver-layer 1c Consumption adjusted levels dataset to storage as a parquet file."""
     price_cap_period_prefix = f"period={utils.normalise_energy_price_cap_period_string(latest_price_cap_period)}"
     storage.ingest_to_silver(

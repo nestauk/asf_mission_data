@@ -23,7 +23,10 @@ logger = logging.getLogger(__name__)
 
 def latest_collection_page_html_soup(collection_url: str) -> BeautifulSoup:
     """Fetch and parse the HTML content of Ofgem data collection page."""
-    return BeautifulSoup(utils.fetch_raw_content(collection_url), "html.parser")
+    content = utils.fetch_raw_content(collection_url)
+    if not content:
+        raise ValueError(f"Empty response from collection page: {collection_url}")
+    return BeautifulSoup(content, "html.parser")
 
 
 @check_output_custom(LatestPriceCapFileUrlValidator(PRICE_CAP_PERIOD_PUBLICATION_DATES))
@@ -67,15 +70,20 @@ def latest_price_cap_period(
 
 def latest_file_content(latest_file_url: str) -> bytes:
     """Fetch the raw content of the latest data file from given URL."""
-    return utils.fetch_raw_content(latest_file_url)
+    content = utils.fetch_raw_content(latest_file_url)
+    if not content:
+        raise ValueError(f"Empty response fetching file: {latest_file_url}")
+    return content
 
 
 def latest_filename(
     latest_file_url: str,
 ) -> str:
     """Extract the file name from data file URL."""
-
-    return Path(latest_file_url).name
+    filename = Path(latest_file_url).name
+    if not filename:
+        raise ValueError(f"Could not extract filename from URL: {latest_file_url}")
+    return filename
 
 
 def bronze_metadata(

@@ -2,6 +2,7 @@
 
 import logging
 
+import numpy as np
 import pandas as pd
 from hamilton.function_modifiers import (
     check_output,
@@ -40,7 +41,10 @@ def silver_df(silver_energy_price_cap_annex_9_dataset: str) -> pd.DataFrame:
 def latest_price_cap_period(silver_df: pd.DataFrame) -> str:
     """Latest price cap period from the silver DataFrame metadata."""
     metadata_dict = silver_df["metadata"].iloc[0]
-    return metadata_dict.get("price_cap_period")
+    period = metadata_dict.get("price_cap_period")
+    if not period:
+        raise KeyError("'price_cap_period' missing from silver metadata.")
+    return period
 
 
 # -------------------------------------------------------------
@@ -81,6 +85,9 @@ def consumption_adjusted_levels_with_vat_df(
     """
 
     # Add VAT as individual tariff component
+    if not silver_df["Tariff component"].eq("Total_GB average").any():
+        raise ValueError("Expected tariff component 'Total_GB average' not found in silver_df.")
+
     vat_rows = silver_df[silver_df["Tariff component"] == "Total_GB average"].copy()
     vat_rows["Tariff component"] = "VAT"
     vat_rows["value"] *= VAT
@@ -188,6 +195,13 @@ def tariff_component_rates_df(
         unit prices by fuel, payment method, tariff component, and price cap
         period, with columns ``Type``, ``Unit``, and ``value``.
     """
+
+    expected_fuels = set(BENCHMARK_CONSUMPTION.keys())
+    found_fuels = set(consumption_adjusted_levels_with_vat_df["Fuel"].unique())
+    missing_fuels = expected_fuels - found_fuels
+    if missing_fuels:
+        raise ValueError(f"Expected fuel(s) not found in data: {missing_fuels}. Found fuels: {found_fuels}.")
+
     index_cols = [
         "Payment method",
         "Fuel",
@@ -202,9 +216,6 @@ def tariff_component_rates_df(
     for fuel, benchmark in BENCHMARK_CONSUMPTION.items():
         fuel_df = consumption_adjusted_levels_with_vat_df.loc[consumption_adjusted_levels_with_vat_df["Fuel"] == fuel]
 
-        if fuel_df.empty:
-            continue
-
         pivoted = (
             fuel_df.pivot_table(
                 index=index_cols,
@@ -214,6 +225,11 @@ def tariff_component_rates_df(
             .rename_axis(None, axis=1)
             .reset_index()
         )
+
+        expected_consumption_cols = {"Nil consumption", "Typical consumption"}
+        missing_consumption_cols = expected_consumption_cols - set(pivoted.columns)
+        if missing_consumption_cols:
+            raise ValueError(f"Expected consumption column(s) missing after pivot for fuel '{fuel}': {missing_consumption_cols}.")
 
         melted = (
             pivoted.assign(
@@ -311,6 +327,12 @@ def total_unit_rates_df(
         electricity in separate columns for each payment method and
         price cap period.
     """
+    expected_fuels = {"Gas", "Electricity: Single-Rate Metering Arrangement"}
+    found_fuels = set(tariff_component_rates_df["Fuel"].unique())
+    missing = expected_fuels - found_fuels
+    if missing:
+        raise ValueError(f"Missing fuels in tariff_component_rates_df: {missing}. Found fuels: {found_fuels}.")
+
     totals_df = tariff_component_rates_df[
         (tariff_component_rates_df["Tariff component"] == "Total_GB average")
         & (tariff_component_rates_df["Fuel"].isin(["Gas", "Electricity: Single-Rate Metering Arrangement"]))
@@ -360,7 +382,10 @@ def gold_price_ratios_df(total_unit_rates_df: pd.DataFrame, silver_df: pd.DataFr
     """
     pivoted = total_unit_rates_df.copy()
 
-    pivoted["value"] = pivoted["Electricity (single rate) unit price"] / pivoted["Gas unit price"]
+    # Gas unit price may be zero in edge cases
+    # Replace the resulting inf with NaN so downstream charts skip the value
+    # rather than rendering a misleading spike
+    pivoted["value"] = (pivoted["Electricity (single rate) unit price"] / pivoted["Gas unit price"]).replace([np.inf, -np.inf], np.nan)
 
     id_cols = [
         "Payment method",
@@ -432,6 +457,12 @@ def annual_bill_fixed_and_variable_contributions_df(
         ``Unit`` ("GBP/year"), and ``value``.
     """
 
+    expected_fuels = set(BENCHMARK_CONSUMPTION.keys())
+    found_fuels = set(consumption_adjusted_levels_with_vat_df["Fuel"].unique())
+    missing_fuels = expected_fuels - found_fuels
+    if missing_fuels:
+        raise ValueError(f"Expected fuel(s) not found in data: {missing_fuels}. Found fuels: {found_fuels}.")
+
     index_cols = [
         "Payment method",
         "Fuel",
@@ -446,9 +477,6 @@ def annual_bill_fixed_and_variable_contributions_df(
     for fuel in BENCHMARK_CONSUMPTION.keys():
         fuel_df = consumption_adjusted_levels_with_vat_df.loc[consumption_adjusted_levels_with_vat_df["Fuel"] == fuel]
 
-        if fuel_df.empty:
-            continue
-
         pivoted = (
             fuel_df.pivot_table(
                 index=index_cols,
@@ -458,6 +486,11 @@ def annual_bill_fixed_and_variable_contributions_df(
             .rename_axis(None, axis=1)
             .reset_index()
         )
+
+        expected_consumption_cols = {"Nil consumption", "Typical consumption"}
+        missing_consumption_cols = expected_consumption_cols - set(pivoted.columns)
+        if missing_consumption_cols:
+            raise ValueError(f"Expected consumption column(s) missing after pivot for fuel '{fuel}': {missing_consumption_cols}.")
 
         melted = (
             pivoted.assign(
