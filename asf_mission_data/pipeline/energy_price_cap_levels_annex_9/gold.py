@@ -9,10 +9,7 @@ from hamilton.function_modifiers import (
 )
 
 from asf_mission_data import storage, utils
-from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import (
-    BENCHMARK_CONSUMPTION,
-    COMPONENT_CATEGORY_MAP,
-)
+from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import BENCHMARK_CONSUMPTION, COMPONENT_CATEGORY_MAP, VAT
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.schemas import (
     GOLD_1C_CONSUMPTION_ADJUSTED_LEVELS_WITH_VAT_SCHEMA,
     GOLD_ANNUAL_BILL_FIXED_AND_VARIABLE_COMPONENT_CONTRIBUTIONS_SCHEMA,
@@ -82,12 +79,11 @@ def consumption_adjusted_levels_with_vat_df(
         VAT as a separate component, and updated `Total_GB average` values
         that include VAT.
     """
-    vat = 0.05
 
     # Add VAT as individual tariff component
     vat_rows = silver_df[silver_df["Tariff component"] == "Total_GB average"].copy()
     vat_rows["Tariff component"] = "VAT"
-    vat_rows["value"] *= vat
+    vat_rows["value"] *= VAT
 
     # Uprate Total_GB average to include VAT
     uprated_silver_df = silver_df.copy()
@@ -95,7 +91,7 @@ def consumption_adjusted_levels_with_vat_df(
     uprated_silver_df.loc[
         (uprated_silver_df["Tariff component"] == "Total_GB average"),
         "value",
-    ] *= 1 + vat
+    ] *= 1 + VAT
 
     # Remove now redundant "Total inc VAT" rows that were present only in the Dual fuel table
     uprated_silver_df = uprated_silver_df[uprated_silver_df["Tariff component"] != "Total inc VAT"]

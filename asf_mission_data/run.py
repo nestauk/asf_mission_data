@@ -5,9 +5,10 @@ import os
 
 from asf_mission_data.logging_utils import configure_logging
 
-# Currently only debug locally.
+# Currently only debug locally
 is_local = not os.environ.get("DATA_ROOT", "").startswith("s3://")
-configure_logging(log_level="DEBUG" if is_local else "INFO")
+log_level = os.environ.get("LOG_LEVEL", "DEBUG" if is_local else "INFO")
+configure_logging(log_level=log_level)
 
 logger = logging.getLogger(__name__)
 

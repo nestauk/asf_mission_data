@@ -173,7 +173,7 @@ def raw_payment_method_table_df(excel_sheet_df: pd.DataFrame, payment_method: st
     if header != payment_method:
         raise ValueError(f"Slice Error: Expected header '{payment_method}' at top of dataframe slice, but found '{header}'")
 
-    logger.info(f"Extracted {payment_method} table: rows {start_index} to {end_index} ({len(df_slice)} rows, {len(df_slice.columns)} columns)")
+    logger.debug(f"Extracted {payment_method} table: rows {start_index} to {end_index} ({len(df_slice)} rows, {len(df_slice.columns)} columns)")
 
     return df_slice
 
