@@ -172,25 +172,11 @@ def ingest_to_bronze(
     metadata: dict[str, Any],
     layer_prefix: str = "bronze",
 ) -> None:
-    """Persists raw dataset files and associated metadata to the bronze storage layer.
+    """Persist raw dataset files and associated metadata to the bronze storage layer.
 
     Behaviour:
-        1. Persist the incoming dataset and metadata to the historical archive.
-        2. Remove any existing files in the "latest" directory.
-        3. Persist the dataset and metadata as the current "latest" version.
-
-    Storage paths are constructed dynamically using the configured DATA_ROOT
-    and can be local or remote storage via URI.
-
-    Storage structure:
-        <data_root>/data/<layer_prefix>/<dataset_prefix>/
-            historical/
-                <date_stamp>/
-                    file/<filename>
-                    metadata/<filename>.metadata.json
-            latest/
-                file/<filename>
-                metadata/<filename>.metadata.json
+        - Stores a historical version with timestamp.
+        - Updates the 'latest' version by replacing previous files.
 
     Args:
         dataset_prefix (str): Dataset identifier used to namespace storage.
@@ -198,7 +184,7 @@ def ingest_to_bronze(
         filename (str): Name of the dataset file.
         date_stamp (str): Canonical timestamp or partition identifier for historical archiving.
         metadata (dict): Provenance metadata associated with dataset.
-        layer_prefix (str): Storage namespace representing the data layer (e.g. "bronze").
+        layer_prefix (str): Storage namespace representing the data layer.
             Defaults to "bronze".
     """
 
@@ -255,55 +241,54 @@ def save_dag(
     persist(historical_file, dag_image)
 
 
-def locate_latest_bronze(
+def _locate_latest(
     dataset_prefix: str,
-    file_or_metadata: str = "file",
-    layer_prefix: str = "bronze",
-) -> str | None:
-    """Locate the latest bronze dataset file or metadata for a given pipeline.
-
-    Args:
-        dataset_prefix (str): Dataset identifier used to namespace storage.
-        file_or_metadata (str, optional): Either 'file' or 'metadata'.
-            Defaults to "file".
-        layer_prefix (str): Storage namespace representing the data layer (e.g. "bronze").
-            Defaults to "bronze".
-
-    Raises:
-        ValueError: If `file_or_metadata` is not 'file' or 'metadata'.
-
-    Returns:
-        str | None: URI of the latest bronze file or metadata, or None if not found.
-    """
-
-    if file_or_metadata not in ["file", "metadata"]:
-        raise ValueError(f"Invalid file type {file_or_metadata} to be located, must be 'file' or 'metadata'.")
-
+    sub_prefix: str,
+    layer_prefix: str,
+) -> str:
     _, data_root = _initialise_environment()
 
-    uri_prefix = f"{data_root}/data/{layer_prefix}/{dataset_prefix}/latest/{file_or_metadata}"
+    uri_prefix = f"{data_root}/data/{layer_prefix}/{dataset_prefix}/latest/{sub_prefix}"
 
     fs, path = fsspec.core.url_to_fs(uri_prefix)
 
     if not fs.exists(path):
-        logger.info("Prefix does not exist: %s", uri_prefix)
-        return None
+        raise FileNotFoundError(f"Prefix does not exist: {uri_prefix}")
 
-    files = fs.glob(path + "/*")
-
-    files = [f for f in files if fs.isfile(f)]
+    files = [f for f in fs.glob(path + "/*") if fs.isfile(f)]
 
     if not files:
-        logger.info("No files found under prefix: %s", uri_prefix)
-        return None
+        raise FileNotFoundError(f"No files found under prefix: {uri_prefix}")
 
-    logger.info(
-        "Found %d item(s) under prefix: %s",
-        len(files),
-        uri_prefix,
-    )
+    logger.info("Found %d item(s) under prefix: %s", len(files), uri_prefix)
 
     return cast(str, fs.unstrip_protocol(files[0]))
+
+
+def locate_latest_bronze(
+    dataset_prefix: str,
+    file_or_metadata: str = "file",
+    layer_prefix: str = "bronze",
+) -> str:
+    """Locate the latest bronze dataset file or metadata.
+
+    Args:
+        dataset_prefix (str): Dataset identifier used to namespace storage.
+        file_or_metadata (str): Either 'file' or 'metadata'. Defaults to "file".
+        layer_prefix (str): Storage namespace representing the data layer.
+            Defaults to "bronze".
+
+    Raises:
+        ValueError: If `file_or_metadata` is not 'file' or 'metadata'.
+        FileNotFoundError: If the prefix or files do not exist.
+
+    Returns:
+        str: URI of the latest bronze file or metadata.
+    """
+    if file_or_metadata not in ["file", "metadata"]:
+        raise ValueError(f"Invalid file type '{file_or_metadata}', must be 'file' or 'metadata'.")
+
+    return _locate_latest(dataset_prefix, file_or_metadata, layer_prefix)
 
 
 def read_excel_sheet(excel_uri: str, sheet_name: str) -> pd.DataFrame:
@@ -377,7 +362,7 @@ def ingest_to_silver(
     date_stamp: str,
     layer_prefix: str = "silver",
 ) -> None:
-    """Save a DataFrame to the silver storage layer.
+    """Persist a DataFrame to the silver storage layer.
 
     Behaviour:
         - Stores a historical version with timestamp.
@@ -388,7 +373,7 @@ def ingest_to_silver(
         df (pd.DataFrame): DataFrame to persist.
         df_name (str): Name of the DataFrame (used in storage paths).
         date_stamp (str): Canonical timestamp for historical storage.
-        layer_prefix (str): Storage namespace representing the data layer (e.g. "silver").
+        layer_prefix (str): Storage namespace representing the data layer.
             Defaults to "silver".
     """
 
@@ -409,42 +394,21 @@ def locate_latest_silver(
     silver_table_prefix: str,
     layer_prefix: str = "silver",
 ) -> str:
-    """Locate the latest silver parquet file for a given pipeline.
+    """Locate the latest silver parquet file.
 
     Args:
         dataset_prefix (str): Dataset identifier used to namespace storage.
+        silver_table_prefix (str): Table name used to namespace storage.
         layer_prefix (str): Storage namespace representing the data layer.
             Defaults to "silver".
 
+    Raises:
+        FileNotFoundError: If the prefix or files do not exist.
+
     Returns:
-        str: URI of the latest bronze file or metadata, or None if not found.
+        str: URI of the latest silver parquet file.
     """
-
-    _, data_root = _initialise_environment()
-
-    uri_prefix = f"{data_root}/data/{layer_prefix}/{dataset_prefix}/latest/{silver_table_prefix}"
-
-    fs, path = fsspec.core.url_to_fs(uri_prefix)
-
-    if not fs.exists(path):
-        logger.info("Prefix does not exist: %s", uri_prefix)
-        return
-
-    files = fs.glob(path + "/*")
-
-    files = [f for f in files if fs.isfile(f)]
-
-    if not files:
-        logger.error("No files found under prefix: %s", uri_prefix)
-        return
-
-    logger.info(
-        "Found %d item(s) under prefix: %s",
-        len(files),
-        uri_prefix,
-    )
-
-    return fs.unstrip_protocol(files[0])
+    return _locate_latest(dataset_prefix, silver_table_prefix, layer_prefix)
 
 
 def read_parquet(parquet_uri: str) -> pd.DataFrame:
@@ -476,7 +440,7 @@ def ingest_to_gold(
     date_stamp: str,
     layer_prefix: str = "gold",
 ) -> None:
-    """Save a DataFrame to the gold storage layer.
+    """Persist a DataFrame to the gold storage layer.
 
     Behaviour:
         - Stores a historical version with timestamp.
@@ -487,7 +451,7 @@ def ingest_to_gold(
         df (pd.DataFrame): DataFrame to persist.
         df_name (str): Name of the DataFrame (used in storage paths).
         date_stamp (str): Canonical timestamp for historical storage.
-        layer_prefix (str): Storage namespace representing the data layer (e.g. "gold").
+        layer_prefix (str): Storage namespace representing the data layer.
             Defaults to "gold".
     """
 

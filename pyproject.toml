@@ -47,6 +47,12 @@ dev = [
     "validate-pyproject[all]>=0.25",
 ]
 
+infrastructure = [
+    "aws-cdk-lib>=2.170.0",
+    "constructs>=10.3.2,<11.0.0",
+    "typeguard==2.13.3",  # pinned: aws-cdk-lib is incompatible with typeguard 4.x
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["asf_mission_data"]
 

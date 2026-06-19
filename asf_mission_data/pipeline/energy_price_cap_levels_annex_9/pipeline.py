@@ -1,8 +1,5 @@
-# Pipeline entry point
 """
-This needs to define the main function
-that orchestrates the execution of the
-pipeline stages.
+Main functions that orchestrate the execution of the pipeline stages for Energy Price Cap Levels Annex 9.
 """
 
 from datetime import datetime, timezone
@@ -14,22 +11,20 @@ from asf_mission_data import storage, utils
 from asf_mission_data.logging_utils import setup_logging
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9 import bronze, gold, silver
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import (
-    ENERGY_PRICE_CAP_LEVELS_ANNEX_9,
+    COLLECTION_URL,
+    DATASET_PREFIX,
+    FILE_LINK_TEXT,
+    GOLD_TABLES_NODES_MAP,
+    PUBLISHER,
+    SILVER_TABLES_NODES_MAP,
 )
 
 logger = setup_logging(__name__)
 
 
 def build_bronze_driver() -> driver.Driver:
-    """Construct a Hamilton driver configured for the  bronze layer of the
-    energy price cap Annex 9 pipeline.
-
-    This function builds and returns a Hamilton `driver.Builder` instance
-    configured with the `bronze` nodes module and necessary pipeline parameters.
-
-    Returns:
-        driver.Builder: Hamilton driver ready to execute the ETL graph defined in
-            the `bronze` module.
+    """Construct Hamilton driver configured to execute the bronze layer DAG for the
+    Energy Price Cap Annex 9 pipeline.
     """
 
     dr = (
@@ -37,10 +32,10 @@ def build_bronze_driver() -> driver.Driver:
         .with_modules(bronze)
         .with_config(
             {
-                "dataset_prefix": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["dataset_prefix"],
-                "collection_url": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["collection_url"],
-                "file_link_text": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["file_link_text"],
-                "publisher": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["publisher"],
+                "dataset_prefix": DATASET_PREFIX,
+                "collection_url": COLLECTION_URL,
+                "file_link_text": FILE_LINK_TEXT,
+                "publisher": PUBLISHER,
                 "pipeline_version": version("asf-mission-data"),
                 "bronze_ingest_timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
             }
@@ -51,12 +46,10 @@ def build_bronze_driver() -> driver.Driver:
 
 
 def run_bronze_pipeline() -> None:
-    """Run the bronze layer of the energy price cap Annex 9 ETL pipeline.
+    """Run the bronze layer of the Energy Price Cap Annex 9 pipeline.
 
-    This function performs the bronze layer workflow:
-        1. Extracting and saving latest raw data file.
-        2. Saving provenance metadata for raw data.
-        3. Generating and saving DAG visualisation of raw file extraction.
+    Extracts and loads latest raw data file to storage.
+    DAG visualiation image is also generated and loaded to storage.
     """
 
     dr = build_bronze_driver()
@@ -81,136 +74,84 @@ def run_bronze_pipeline() -> None:
     # save dag image
     storage.save_dag(
         layer_prefix="bronze",
-        dataset_prefix=ENERGY_PRICE_CAP_LEVELS_ANNEX_9["dataset_prefix"],
+        dataset_prefix=DATASET_PREFIX,
         accompanying_filename=latest_filename,
         dag_image=dag_png,
         date_stamp=f"period={utils.normalise_energy_price_cap_period_string(results['latest_price_cap_period'])}",
     )
 
 
-def build_silver_1c_consumption_adjusted_levels_driver() -> driver.Driver:
-    """Construct a Hamilton driver for the silver layer processing of tariff tables.
-
-    This driver is configured with the `silver` nodes module and the relevant
-    sheet name from the configuration to execute the ETL workflow for silver-layer
-    datasets.
-
-    Returns:
-        driver.Builder: Configured Hamilton driver ready to execute the silver ETL graph.
+def build_silver_driver(sheet_name: str) -> driver.Driver:
+    """Construct a general Hamilton driver configured to execute silver layer DAG for a specific table in
+    the Energy Price Cap Annex 9 pipeline.
     """
-
-    sheet_name = "1c Consumption adjusted levels"  # TODO refactor
-
-    dr = (
-        driver.Builder()
-        .with_modules(silver)
-        .with_config({"dataset_prefix": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["dataset_prefix"], "sheet_name": sheet_name})
-        .build()
-    )
+    dr = driver.Builder().with_modules(silver).with_config({"dataset_prefix": DATASET_PREFIX, "sheet_name": sheet_name}).build()
     return dr
 
 
 def run_silver_pipeline() -> None:
-    """Execute the silver layer workflow for tariff tables in the Energy Price Cap Levels Annex 9 pipeline.
+    """Run the silver layer of the Energy Price Cap Annex 9 pipeline for 1c Consumption adjusted levels table.
 
-    Workflow steps:
-        1. Run the ETL workflow for silver tariff tables.
-        2. Persist the resulting Parquet dataset.
-        3. Generate a DAG visualisation for the silver ETL nodes and save it
-           for traceability.
-
-    Note:
-        Additional silver-layer drivers can be added to this function as more
-        silver datasets are processed.
+    Extracts latest bronze file, transforms into silver tables and loads to silver-layer storage.
+    DAG visualiation images are also generated and loaded to storage.
     """
 
-    # ----- Silver dataset: 1c consumption adjusted levels -----
+    for sheet_name, output_node in SILVER_TABLES_NODES_MAP.items():
+        driver = build_silver_driver(sheet_name=sheet_name)
 
-    consumption_adjusted_levels_dr = build_silver_1c_consumption_adjusted_levels_driver()
-    sheet_name = "1c Consumption adjusted levels"  # TODO refactor
+        results = driver.execute([output_node, "latest_price_cap_period"])
 
-    node_targets = [
-        "silver_energy_price_cap_annex_9_1c_consumption_adjusted_levels_parquet",
-        "latest_price_cap_period",
-    ]
-    results = consumption_adjusted_levels_dr.execute(node_targets)
+        dag_png = driver.visualize_execution([output_node]).pipe(format="png")
 
-    # generate dag image
-    dag_png = consumption_adjusted_levels_dr.visualize_execution(
-        ["silver_energy_price_cap_annex_9_1c_consumption_adjusted_levels_parquet"],
-        None,
-        render_kwargs={},
-    ).pipe(format="png")
-
-    # save dag image
-    storage.save_dag(
-        layer_prefix="silver",
-        dataset_prefix=ENERGY_PRICE_CAP_LEVELS_ANNEX_9["dataset_prefix"],
-        accompanying_filename=sheet_name.lower().replace(" ", "_"),
-        dag_image=dag_png,
-        date_stamp=f"period={utils.normalise_energy_price_cap_period_string(results['latest_price_cap_period'])}",
-    )
-
-
-# -------------------------------------------------------------
-# Gold
-# -------------------------------------------------------------
-
-
-# TODO refactor to be more generic and move to common module
-# NOTE this is for gold tables from 1c consumption adjusted levels sheet only
-def build_gold_driver() -> driver.Builder:
-    """Construct a Hamilton driver for the gold layer of the Energy Price Cap
-        Annex 9 pipeline.
-
-    This driver is configured with the `gold` nodes module and the relevant
-    sheet name from the configuration to execute the ETL workflow for gold-layer
-    datasets.
-
-    Returns:
-        driver.Builder: Configured Hamilton driver ready to execute the gold ETL graph.
-    """
-
-    dr = (
-        driver.Builder()
-        .with_modules(gold)
-        .with_config(
-            {"dataset_prefix": ENERGY_PRICE_CAP_LEVELS_ANNEX_9["dataset_prefix"], "silver_table_prefix": "1c_consumption_adjusted_levels"}
+        storage.save_dag(
+            layer_prefix="silver",
+            dataset_prefix=DATASET_PREFIX,
+            accompanying_filename=sheet_name.lower().replace(".", "_").replace(" ", "_"),
+            dag_image=dag_png,
+            date_stamp=f"period={utils.normalise_energy_price_cap_period_string(results['latest_price_cap_period'])}",
         )
-        .build()
-    )
+
+
+def build_gold_driver(silver_table_prefix: str) -> driver.Driver:
+    """Construct a general Hamilton driver configured to execute gold layer DAGs from a specified silver table in
+    the Energy Price Cap Annex 9 pipeline.
+    """
+    dr = driver.Builder().with_modules(gold).with_config({"dataset_prefix": DATASET_PREFIX, "silver_table_prefix": silver_table_prefix}).build()
     return dr
 
 
-def run_gold_pipeline():
-    """Execute the gold layer worflow for the Energy Price Cap Levels Annex 9 pipeline.
+def run_gold_pipeline() -> None:
+    """Run the gold layer for the Energy Price Cap Levels Annex 9 pipeline.
 
     Gold datasets generated:
-        - Consumption-adjusted tariff levels including VAT as an explicit component
-        - Tariff component standing charges (p/day) and unit prices (p/kWh) for each fuel,
+        1. Consumption-adjusted tariff levels including VAT as an explicit component
+        2. Tariff component standing charges (p/day) and unit prices (p/kWh) for each fuel,
             payment method and price cap period.
-        - Price ratios for electricity (single-rate) and gas,
+        3. Price ratios for electricity (single-rate) and gas,
             for each payment method and price cap period.
-        - Annual bill contriutions from standing charges and consumption-based costs for
+        4. Annual bill contriutions from standing charges and consumption-based costs for
             each fuel, payment method and price cap period.
     """
 
-    gold_dr = build_gold_driver()
-    gold_dr.execute(["gold_1c_consumption_adjusted_levels_with_vat_parquet"])
-    gold_dr.execute(["gold_tariff_component_rates_parquet"])
-    gold_dr.execute(["gold_price_ratios_parquet"])
-    gold_dr.execute(["gold_annual_bill_fixed_and_variable_component_contributions_parquet"])
+    for silver_table_prefix, output_nodes in GOLD_TABLES_NODES_MAP.items():
+        driver = build_gold_driver(silver_table_prefix=silver_table_prefix)
 
-    # TODO decide whether we need this if we want to save DAG images for gold
-    # latest_price_cap_period_str = gold_dr.execute("latest_price_cap_period")["latest_price_cap_period"]
+        results = driver.execute(output_nodes + ["latest_price_cap_period"])
 
-
-# -------------------------------------------------------------
-# Pipeline execution entry point
-# -------------------------------------------------------------
+        for node in output_nodes:
+            dag_png = driver.visualize_execution([node]).pipe(format="png")
+            accompanying_filename = node.replace("_parquet", "")
+            storage.save_dag(
+                layer_prefix="gold",
+                dataset_prefix=DATASET_PREFIX,
+                accompanying_filename=accompanying_filename,
+                dag_image=dag_png,
+                date_stamp=f"period={utils.normalise_energy_price_cap_period_string(results['latest_price_cap_period'])}",
+            )
 
 
 def run(stage: str = "bronze", extra_args: list[str] | None = None) -> None:
+    """Pipeline execution entry point."""
     if stage in ("bronze", "all"):
         logger.info("Starting bronze stage")
         run_bronze_pipeline()
@@ -220,3 +161,8 @@ def run(stage: str = "bronze", extra_args: list[str] | None = None) -> None:
         logger.info("Starting silver stage")
         run_silver_pipeline()
         logger.info("Completed silver stage")
+
+    if stage in ("gold", "all"):
+        logger.info("Starting gold stage")
+        run_gold_pipeline()
+        logger.info("Completed gold stage")

@@ -3,6 +3,7 @@
 Usage:
     python scripts/trigger_pipeline.py example --stage all
     python scripts/trigger_pipeline.py <pipeline_name> --stage bronze
+    python scripts/trigger_pipeline.py <pipeline_name> --environment prod
     python scripts/trigger_pipeline.py <pipeline_name> --capacity-provider FARGATE_SPOT
 """
 
@@ -15,11 +16,15 @@ from typing import Any
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 
-CLUSTER = os.environ.get("ECS_CLUSTER", "asf-mission-data-dev")
-TASK_FAMILY = os.environ.get("ECS_TASK_FAMILY", "asf-mission-data-dev")
-SUBNET_IDS = os.environ.get("ECS_SUBNETS", "subnet-5cc6e511,subnet-eb6fcb82,subnet-1de6f466").split(",")
-SECURITY_GROUP_IDS = os.environ.get("ECS_SECURITY_GROUPS", "sg-0df80dcbbc597eabb").split(",")
 AWS_REGION = os.environ.get("AWS_REGION", "eu-west-2")
+
+
+@dataclass(frozen=True)
+class InfraConfig:
+    cluster: str
+    task_family: str
+    subnet_ids: list[str]
+    security_group_ids: list[str]
 
 
 @dataclass(frozen=True)
@@ -43,21 +48,39 @@ def emit_github_actions_annotation(level: str, message: str) -> None:
     print(f"::{level}::{escape_github_actions_value(message)}")
 
 
+def get_infra_config(environment: str) -> InfraConfig:
+    """Look up infrastructure values from CloudFormation stack outputs."""
+    cfn = boto3.client("cloudformation", region_name=AWS_REGION)
+    stack_name = f"asf-core-{environment}"
+    response = cfn.describe_stacks(StackName=stack_name)
+    outputs = {o["OutputKey"]: o["OutputValue"] for o in response["Stacks"][0]["Outputs"]}
+    return InfraConfig(
+        cluster=outputs["ClusterArn"],
+        task_family=f"asf-mission-data-{environment}",
+        subnet_ids=outputs["SubnetIds"].split(","),
+        security_group_ids=[outputs["SecurityGroupId"]],
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run a pipeline on ECS Fargate.")
     parser.add_argument("pipeline", help="Pipeline name (must match a key in pipelines.yaml)")
+    parser.add_argument(
+        "--environment",
+        choices=["dev", "prod"],
+        default=os.environ.get("ASF_ENVIRONMENT", "dev"),
+        help="Target environment (default: ASF_ENVIRONMENT env var or dev)",
+    )
     parser.add_argument(
         "--stage",
         choices=["all", "bronze", "silver", "gold"],
         default="all",
         help="Which stage to run (default: all)",
     )
-    # os.environ.get fallback is for local users who prefer setting env vars over typing long flags
-    # CLI arg takes precedence, env var is the fallback, dev-latest is last resort
     parser.add_argument(
         "--image-tag",
-        default=os.environ.get("IMAGE_TAG", "dev-latest"),
-        help="ECR image tag to run (default: IMAGE_TAG env var or dev-latest)",
+        default=None,
+        help="ECR image tag to run (default: {environment}-latest)",
     )
     parser.add_argument(
         "--capacity-provider",
@@ -65,10 +88,15 @@ def parse_args() -> argparse.Namespace:
         default=os.environ.get("ECS_CAPACITY_PROVIDER", "FARGATE"),
         help="Which ECS capacity provider to use (default: ECS_CAPACITY_PROVIDER or FARGATE)",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.image_tag is None:
+        args.image_tag = f"{args.environment}-latest"
+    return args
 
 
-def get_app_container_image(container_definitions: list[dict[str, Any]]) -> str:
+def get_app_container_image(
+    container_definitions: list[dict[str, Any]],
+) -> str:
     for container in container_definitions:
         if container["name"] == "app":
             return container["image"]
@@ -95,17 +123,17 @@ def ensure_image_tag_exists(image_uri: str, image_tag: str) -> None:
     failures = response.get("failures", [])
     if failures:
         failure_codes = ", ".join(sorted({failure["failureCode"] for failure in failures}))
-        raise ValueError(f"Image tag '{image_tag}' was not found in ECR repository '{repository_name}' (failure: {failure_codes})")
+        raise ValueError(f"Could not find the image tag '{image_tag}' in ECR repository '{repository_name}' (failure: {failure_codes})")
 
-    raise ValueError(f"Image tag '{image_tag}' was not found in ECR repository '{repository_name}'")
+    raise ValueError(f"Could not find the image tag '{image_tag}' in ECR repository '{repository_name}'")
 
 
-def resolve_task_definition(image_tag: str) -> ResolvedTaskDefinition:
+def resolve_task_definition(image_tag: str, infra: InfraConfig, environment: str) -> ResolvedTaskDefinition:
     ecsclient = boto3.client("ecs", region_name=AWS_REGION)
-    response = ecsclient.describe_task_definition(taskDefinition=TASK_FAMILY)
+    response = ecsclient.describe_task_definition(taskDefinition=infra.task_family)
     current = response["taskDefinition"]
 
-    if image_tag == "dev-latest":
+    if image_tag == f"{environment}-latest":
         return ResolvedTaskDefinition(
             task_definition=current["taskDefinitionArn"],
             app_image=get_app_container_image(current["containerDefinitions"]),
@@ -147,9 +175,9 @@ def resolve_task_definition(image_tag: str) -> ResolvedTaskDefinition:
     )
 
 
-def run_task(pipeline: str, stage: str, capacity_provider: str, task_definition: str) -> None:
+def run_task(pipeline: str, stage: str, capacity_provider: str, task_definition: str, infra: InfraConfig) -> None:
     params: dict[str, Any] = {
-        "cluster": CLUSTER,
+        "cluster": infra.cluster,
         "taskDefinition": task_definition,
         "count": 1,
         "capacityProviderStrategy": [
@@ -160,8 +188,8 @@ def run_task(pipeline: str, stage: str, capacity_provider: str, task_definition:
         ],
         "networkConfiguration": {
             "awsvpcConfiguration": {
-                "subnets": SUBNET_IDS,
-                "securityGroups": SECURITY_GROUP_IDS,
+                "subnets": infra.subnet_ids,
+                "securityGroups": infra.security_group_ids,
                 "assignPublicIp": "ENABLED",
             }
         },
@@ -192,18 +220,26 @@ def run_task(pipeline: str, stage: str, capacity_provider: str, task_definition:
 
     task_arn = response["tasks"][0]["taskArn"]
     task_id = task_arn.split("/")[-1]
+    cluster_name = infra.cluster.split("/")[-1]
     print(f"Task started: {task_id}")
     print(f"Capacity:     {capacity_provider}")
     print(
-        f"Watch it:     aws ecs describe-tasks --cluster {CLUSTER} --tasks {task_id}"  # noqa: E501
+        f"Watch it:     aws ecs describe-tasks --cluster {cluster_name} --tasks {task_id}"  # noqa: E501
     )
-    print(f"Logs:         aws logs tail /ecs/{CLUSTER} --follow")
+    print(f"Logs:         aws logs tail /ecs/{cluster_name} --follow")
 
 
 if __name__ == "__main__":
     args = parse_args()
     try:
-        resolved = resolve_task_definition(args.image_tag)
+        infra = get_infra_config(args.environment)
+    except (BotoCoreError, ClientError) as exc:
+        emit_github_actions_annotation("error", f"Error looking up infrastructure: {exc}")
+        print(f"Error looking up infrastructure for '{args.environment}': {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        resolved = resolve_task_definition(args.image_tag, infra, args.environment)
     except (BotoCoreError, ClientError, ValueError) as exc:
         emit_github_actions_annotation("error", f"Error resolving task definition: {exc}")
         print(f"Error resolving task definition: {exc}", file=sys.stderr)
@@ -213,4 +249,10 @@ if __name__ == "__main__":
     emit_github_actions_annotation("notice", f"Container image: {resolved.app_image}")
     print(f"Task definition: {resolved.task_definition}")
     print(f"Container image: {resolved.app_image}")
-    run_task(args.pipeline, args.stage, args.capacity_provider, resolved.task_definition)
+    run_task(
+        args.pipeline,
+        args.stage,
+        args.capacity_provider,
+        resolved.task_definition,
+        infra,
+    )

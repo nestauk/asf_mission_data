@@ -41,6 +41,7 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+infrastructure/.env
 
 # Local data and pipeline output
 # When running pipelines locally with DATA_ROOT=/tmp/pipeline-dev or similar,
@@ -56,7 +57,11 @@ Thumbs.db
 .recipes/
 .cookiecutter/state/
 
-# CDK context files
+
+# CDK
+cdk.out/
 cdk.context.json
 infrastructure/.coverage
-infrastructure/cdk.out/
+.cdk.staging/
+cdk-integ.out.*.snapshot/
+integ_.*.py.snapshot/
