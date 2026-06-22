@@ -8,6 +8,12 @@ COLLECTION_URL = "https://www.gov.uk/government/collections/heat-pump-deployment
 PAGE_LINK_TEXT = "Heat pump deployment statistics:"
 FILE_LINK_TEXT = "Heat pump deployment statistics:"
 
+# Excel sheet name - Silver table Hamilton output node
+SILVER_TABLES_NODES_MAP = {
+    "Table 1.1": "silver_heat_pump_deployment_statistics_table_1_1_parquet",
+    "Table 1.2": "silver_heat_pump_deployment_statistics_table_1_2_parquet",
+}
+
 # Table 1.1
 TABLE_1_1_VALUE_VARS = [
     "Air-to-water heat pump installations",
