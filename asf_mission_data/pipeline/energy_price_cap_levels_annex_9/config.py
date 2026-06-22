@@ -13,6 +13,7 @@ PRICE_CAP_PERIOD_INTERVAL_PATTERN = (
     r"(?P<start_day>\d{1,2})\s+(?P<start_month>[A-Za-z]+)\s+to\s+(?P<end_day>\d{1,2})\s+(?P<end_month>[A-Za-z]+)\s+(?P<year>\d{4})"
 )
 
+# Expected publication dates
 PRICE_CAP_PERIOD_PUBLICATION_DATES = {
     "1 January to 31 March 2026": "2025-11-21",
     "1 April to 30 June 2026": "2026-02-25",
@@ -34,6 +35,22 @@ PRICE_CAP_PERIOD_PUBLICATION_DATES = {
     "1 April to 30 June 2030": "2030-02-27",
     "1 July to 30 September 2030": "2030-05-29",
     "1 October to 31 December 2030": "2030-08-28",
+}
+
+# For 28AD Charge Restriction Period string formatting
+MONTH_NORMALISATION = {
+    "April": "Apr",
+    "June": "Jun",
+    "September": "Sep",
+    "Sept": "Sep",
+    "July": "Jul",
+    "January": "Jan",
+    "February": "Feb",
+    "March": "Mar",
+    "August": "Aug",
+    "October": "Oct",
+    "November": "Nov",
+    "December": "Dec",
 }
 
 # Excel sheet name - Silver table Hamilton output node

@@ -162,6 +162,13 @@ def convert_energy_price_cap_charge_restriction_period_string_to_interval(
         raise ValueError("Charge restriction period string '%s' does not match expected regex pattern.")
 
 
+def normalise_charge_restriction_period(period: str, month_map: dict[str, str]) -> str:
+    """Normalise charge restriction period string to consistent abbreviated format."""
+    for full, abbrev in month_map.items():
+        period = period.replace(full, abbrev)
+    return period
+
+
 def normalise_date_string(date_str: str) -> str:
     """Convert a date string from 'DD Month YYYY' format to 'YYYY-MM-DD'.
 
