@@ -249,3 +249,31 @@ class TariffComponentsTotalValidator(DataValidator):
             passes=valid,
             message=f"Tariff components must sum to Total_GB average for column '{self.value_col}'.",
         )
+
+
+class ChargeRestrictionPeriodValidator(DataValidator):
+    """Checks that all 28AD Charge Restriction Period values are in normalised format (MMM YYYY - MMM YYYY)."""
+
+    def __init__(self, importance: str = "fail"):
+        super().__init__(importance=importance)
+        self.pattern = r"^[A-Z][a-z]{2} \d{4} - [A-Z][a-z]{2} \d{4}$"
+
+    def applies_to(self, datatype: type) -> bool:
+        return datatype is pd.DataFrame
+
+    def description(self) -> str:
+        return "Checks that all 28AD Charge Restriction Period values are in normalised format: 'MMM YYYY - MMM YYYY'."
+
+    @classmethod
+    def name(cls) -> str:
+        return "ChargeRestrictionPeriodValidator"
+
+    def validate(self, data: pd.DataFrame) -> ValidationResult:
+        invalid = data[~data["28AD Charge Restriction Period"].str.match(self.pattern)]["28AD Charge Restriction Period"].unique().tolist()
+
+        if invalid:
+            return ValidationResult(
+                passes=False,
+                message=f"Found non-normalised charge restriction periods: {invalid}",
+            )
+        return ValidationResult(passes=True, message="All charge restriction periods are correctly normalised.")
