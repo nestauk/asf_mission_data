@@ -16,6 +16,7 @@ from asf_mission_data.pipeline.heat_pump_deployment_statistics.config import (
     FILE_LINK_TEXT,
     PAGE_LINK_TEXT,
     PUBLISHER,
+    SILVER_TABLES_NODES_MAP,
 )
 
 logger = setup_logging(__name__)
@@ -88,12 +89,7 @@ def run_silver_pipeline() -> None:
     DAG visualiation images are also generated and loaded to storage.
     """
 
-    tables = [
-        ("Table 1.1", "silver_heat_pump_deployment_statistics_table_1_1_parquet"),
-        ("Table 1.2", "silver_heat_pump_deployment_statistics_table_1_2_parquet"),
-    ]
-
-    for sheet_name, output_node in tables:
+    for sheet_name, output_node in SILVER_TABLES_NODES_MAP.items():
         driver = build_silver_driver(sheet_name=sheet_name)
 
         results = driver.execute([output_node, "latest_publication_date"])
