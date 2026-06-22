@@ -1,10 +1,8 @@
 """Hamilton nodes for bronze-layer of the Heat Pump Deployment Statistics pipeline"""
 
-import re
+from datetime import datetime
 from pathlib import Path
-from urllib.parse import urljoin
 
-from bs4 import BeautifulSoup
 from hamilton.function_modifiers import check_output_custom
 
 from asf_mission_data import storage, utils
@@ -14,32 +12,28 @@ from asf_mission_data.pipeline.heat_pump_deployment_statistics.validators import
 logger = setup_logging(__name__)
 
 
-def latest_collection_page_html_soup(collection_url: str) -> BeautifulSoup:
-    """Fetch and parse the HTML content of collection page."""
-    return BeautifulSoup(utils.fetch_raw_content(collection_url), "html.parser")
+def latest_release_api_response(collection_url: str) -> dict:
+    """Fetch the latest release metadata from the GOV.UK Content API."""
+    collection_data = utils.fetch_govuk_content(collection_url)
+    documents = utils.safe_get_govuk_response(collection_data, "links", "documents")
+    latest = sorted(documents, key=lambda x: x["public_updated_at"], reverse=True)[0]
+    return utils.fetch_govuk_content(latest["web_url"])
 
 
-def latest_release_page_url(collection_url: str, latest_collection_page_html_soup: BeautifulSoup, page_link_text: str) -> str:
-    """Find link to latest release page on the collection page."""
-    for a in latest_collection_page_html_soup.find_all("a", href=True):
-        if page_link_text in a.get_text():
-            return urljoin(collection_url, a["href"])
-
-    raise ValueError(f"Could not find statistical release page '{page_link_text}' at {collection_url}")
+def latest_release_page_url(latest_release_api_response: dict) -> str:
+    """Extract the URL of the latest release page."""
+    return utils.safe_get_govuk_response(latest_release_api_response, "links", "available_translations", 0, "web_url")
 
 
-def latest_release_page_html_soup(latest_release_page_url: str) -> BeautifulSoup:
-    """Fetch and parse the HTML content of latest release page."""
-    return BeautifulSoup(utils.fetch_raw_content(latest_release_page_url), "html.parser")
-
-
-def latest_file_url(latest_release_page_url: str, latest_release_page_html_soup: BeautifulSoup, file_link_text: str) -> str:
-    """Find link to download latest released data file."""
-    for a in latest_release_page_html_soup.find_all("a", href=True):
-        if file_link_text in a.get_text():
-            return urljoin(latest_release_page_url, a["href"])
-
-    raise ValueError(f"Could not find dataset '{file_link_text}' at {latest_release_page_url}")
+def latest_file_url(
+    latest_release_api_response: dict, file_content_type: str = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+) -> str:
+    """Extract the latest Excel file URL from the GOV.UK Content API response."""
+    attachments = utils.safe_get_govuk_response(latest_release_api_response, "details", "attachments")
+    try:
+        return next(a["url"] for a in attachments if a["content_type"] == file_content_type)
+    except StopIteration as e:
+        raise ValueError(f"Could not find attachment with content type '{file_content_type}'") from e
 
 
 def latest_file_content(latest_file_url: str) -> bytes:
@@ -54,11 +48,13 @@ def latest_filename(latest_file_url: str) -> str:
 
 
 @check_output_custom(WithinThreeCalendarMonthsValidator())
-def latest_publication_date(latest_release_page_html_soup: BeautifulSoup) -> str:
-    """Extract publication date of downloaded data file."""
-    match = re.search(r"Published\s+(\d{1,2}\s+\w+\s+\d{4})", latest_release_page_html_soup.get_text())
-    if match:
-        return match.group(1)
+def latest_publication_date(latest_release_api_response: dict) -> str:
+    """Extract publication date of the latest release."""
+    change_history = utils.safe_get_govuk_response(latest_release_api_response, "details", "change_history")
+    if not change_history:
+        raise ValueError("No change history (i.e. publication date) found in API response for latest release.")
+    raw = utils.safe_get_govuk_response(change_history, 0, "public_timestamp")
+    return datetime.strptime(raw, "%Y-%m-%dT%H:%M:%SZ").strftime("%d %B %Y")
 
 
 def bronze_metadata(
