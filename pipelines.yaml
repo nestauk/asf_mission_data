@@ -19,4 +19,9 @@ pipelines:
     description: Ofgem energy price cap Annex 9 Final levelised cap rates model data
     source_url: https://www.ofgem.gov.uk/energy-regulation/domestic-and-non-domestic/energy-pricing-rules/energy-price-cap/energy-price-cap-default-tariff-levels
     stages: [bronze, silver, gold]
-    stack_name: TBC
+  heat_pump_deployment_statistics:
+    owner: Elysia
+    schedule:  TBC
+    description: UK Government data on the number of heat pumps installed in the UK
+    source_url: hhttps://www.gov.uk/government/collections/heat-pump-deployment-statistics
+    stages: [bronze, silver]

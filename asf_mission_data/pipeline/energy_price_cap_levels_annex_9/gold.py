@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 def silver_energy_price_cap_annex_9_dataset(dataset_prefix: str, silver_table_prefix: str) -> str:
     """Latest silver-level dataset for Energy Price Cap Annex 9."""
-    return storage.locate_latest_silver(dataset_prefix, silver_table_prefix)
+    return storage.locate_latest(dataset_prefix, silver_table_prefix, "silver")
 
 
 def silver_df(silver_energy_price_cap_annex_9_dataset: str) -> pd.DataFrame:
@@ -137,6 +137,14 @@ def gold_1c_consumption_adjusted_levels_with_vat_df(
 
     # Add metadata
     df["metadata"] = [silver_df["metadata"][0]] * len(df)
+
+    # Add change from previous price cap period
+    df = df.sort_values("28AD Charge Restriction Period start")
+    df["change_from_previous_period"] = df.groupby(["Tariff component", "Fuel", "Payment method", "Consumption"])["value"].diff()
+    df["pct_change_from_previous_period"] = (
+        df.groupby(["Tariff component", "Fuel", "Payment method", "Consumption"])["value"].pct_change().mul(100).round(2)
+    )
+
     return df
 
 
@@ -284,6 +292,14 @@ def gold_tariff_component_rates_df(
 
     # Add metadata
     df["metadata"] = [silver_df["metadata"][0]] * len(df)
+
+    # Add change from previous price cap period
+    df = df.sort_values("28AD Charge Restriction Period start")
+    df["change_from_previous_period"] = df.groupby(["Tariff component", "Fuel", "Payment method", "Type"])["value"].diff()
+    df["pct_change_from_previous_period"] = (
+        df.groupby(["Tariff component", "Fuel", "Payment method", "Type"])["value"].pct_change().mul(100).round(2)
+    )
+
     return df
 
 
@@ -398,6 +414,11 @@ def gold_price_ratios_df(total_unit_rates_df: pd.DataFrame, silver_df: pd.DataFr
 
     df["Variable"] = "Electricity to gas price ratio"
     df["metadata"] = [silver_df["metadata"][0]] * len(df)
+
+    # Add change from previous price cap period
+    df = df.sort_values("28AD Charge Restriction Period start")
+    df["change_from_previous_period"] = df.groupby(["Payment method"])["value"].diff()
+    df["pct_change_from_previous_period"] = df.groupby(["Payment method"])["value"].pct_change().mul(100).round(2)
 
     return df.reset_index(drop=True)
 
@@ -553,6 +574,14 @@ def gold_annual_bill_fixed_and_variable_component_contributions_df(
 
     # Add metadata
     df["metadata"] = [silver_df["metadata"][0]] * len(df)
+
+    # Add change from previous price cap period
+    df = df.sort_values("28AD Charge Restriction Period start")
+    df["change_from_previous_period"] = df.groupby(["Tariff component", "Fuel", "Payment method", "Type"])["value"].diff()
+    df["pct_change_from_previous_period"] = (
+        df.groupby(["Tariff component", "Fuel", "Payment method", "Type"])["value"].pct_change().mul(100).round(2)
+    )
+
     return df
 
 

@@ -13,15 +13,11 @@ from hamilton.function_modifiers import (
 )
 
 from asf_mission_data import storage, utils
-from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import (
-    PRICE_CAP_PERIOD_PUBLICATION_DATES,
-)
+from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import MONTH_NORMALISATION, PRICE_CAP_PERIOD_PUBLICATION_DATES
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.schemas import (
     SILVER_1C_CONSUMPTION_ADJUSTED_LEVELS_SCHEMA,
 )
-from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.validators import (
-    PriceCapValidator,
-)
+from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.validators import ChargeRestrictionPeriodValidator, PriceCapValidator
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 def bronze_energy_price_cap_annex_9_file(dataset_prefix: str) -> str:
     """Latest bronze-level dataset for Energy Price Cap Annex 9."""
-    return storage.locate_latest_bronze(dataset_prefix, "file")
+    return storage.locate_latest(dataset_prefix, "file", "bronze")
 
 
 def excel_sheet_df(bronze_energy_price_cap_annex_9_file: str, sheet_name: str) -> pd.DataFrame:
@@ -42,7 +38,7 @@ def excel_sheet_df(bronze_energy_price_cap_annex_9_file: str, sheet_name: str) -
 
 def bronze_energy_price_cap_annex_9_metadata(dataset_prefix: str) -> dict:
     """Load metadata associated with the latest bronze dataset."""
-    metadata_uri = storage.locate_latest_bronze(dataset_prefix, "metadata")
+    metadata_uri = storage.locate_latest(dataset_prefix, "metadata", "bronze")
     return storage.read_json(metadata_uri)
 
 
@@ -444,6 +440,7 @@ def fuel_payment_method_tidy_df(
     return pd.concat([melted_fuel_nil_consumption_df, melted_fuel_typical_consumption_df]).dropna(subset={"Tariff component"})
 
 
+@check_output_custom(ChargeRestrictionPeriodValidator())
 def all_tariff_tables_tidy_df(
     electricity_single_rate_other_payment_method_tidy_df: pd.DataFrame,
     electricity_multi_register_other_payment_method_tidy_df: pd.DataFrame,
@@ -482,7 +479,12 @@ def all_tariff_tables_tidy_df(
     if empty:
         raise ValueError(f"Tariff table(s) are empty: {empty}")
 
-    return pd.concat(all_dfs.values(), ignore_index=True)
+    # Standardise price cap period string
+    df = pd.concat(all_dfs, ignore_index=True)
+    df["28AD Charge Restriction Period"] = df["28AD Charge Restriction Period"].apply(
+        lambda x: utils.normalise_charge_restriction_period(x, MONTH_NORMALISATION)
+    )
+    return df
 
 
 @extract_columns(
@@ -560,6 +562,7 @@ def all_tariff_tables_tidy_with_metadata_df(
     for col in string_cols:
         if col in df.columns:
             df[col] = df[col].astype(str)
+
     return df
 
 

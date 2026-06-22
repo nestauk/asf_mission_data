@@ -243,11 +243,24 @@ def save_dag(
     persist(historical_file, dag_image)
 
 
-def _locate_latest(
+def locate_latest(
     dataset_prefix: str,
     sub_prefix: str,
     layer_prefix: str,
 ) -> str:
+    """Locate the latest file under a given storage prefix.
+
+    Args:
+        dataset_prefix (str): Dataset identifier used to namespace storage.
+        sub_prefix (str): Sub-prefix to locate (e.g. 'file', 'metadata', or a table name).
+        layer_prefix (str): Storage namespace representing the data layer (e.g. 'bronze', 'silver').
+
+    Raises:
+        FileNotFoundError: If the prefix or files do not exist.
+
+    Returns:
+        str: URI of the latest file.
+    """
     _, data_root = _initialise_environment()
 
     uri_prefix = f"{data_root}/data/{layer_prefix}/{dataset_prefix}/latest/{sub_prefix}"
@@ -265,32 +278,6 @@ def _locate_latest(
     logger.debug("Found %d item(s) under prefix: %s", len(files), uri_prefix)
 
     return cast(str, fs.unstrip_protocol(files[0]))
-
-
-def locate_latest_bronze(
-    dataset_prefix: str,
-    file_or_metadata: str = "file",
-    layer_prefix: str = "bronze",
-) -> str:
-    """Locate the latest bronze dataset file or metadata.
-
-    Args:
-        dataset_prefix (str): Dataset identifier used to namespace storage.
-        file_or_metadata (str): Either 'file' or 'metadata'. Defaults to "file".
-        layer_prefix (str): Storage namespace representing the data layer.
-            Defaults to "bronze".
-
-    Raises:
-        ValueError: If `file_or_metadata` is not 'file' or 'metadata'.
-        FileNotFoundError: If the prefix or files do not exist.
-
-    Returns:
-        str: URI of the latest bronze file or metadata.
-    """
-    if file_or_metadata not in ["file", "metadata"]:
-        raise ValueError(f"Invalid file type '{file_or_metadata}', must be 'file' or 'metadata'.")
-
-    return _locate_latest(dataset_prefix, file_or_metadata, layer_prefix)
 
 
 def read_excel_sheet(excel_uri: str, sheet_name: str) -> pd.DataFrame:
@@ -384,28 +371,6 @@ def ingest_to_silver(
     persist_df_parquet(latest_file, df)
 
     logger.info("Ingested '%s' to %s (%s)", df_name, layer_prefix, date_stamp)
-
-
-def locate_latest_silver(
-    dataset_prefix: str,
-    silver_table_prefix: str,
-    layer_prefix: str = "silver",
-) -> str:
-    """Locate the latest silver parquet file.
-
-    Args:
-        dataset_prefix (str): Dataset identifier used to namespace storage.
-        silver_table_prefix (str): Table name used to namespace storage.
-        layer_prefix (str): Storage namespace representing the data layer.
-            Defaults to "silver".
-
-    Raises:
-        FileNotFoundError: If the prefix or files do not exist.
-
-    Returns:
-        str: URI of the latest silver parquet file.
-    """
-    return _locate_latest(dataset_prefix, silver_table_prefix, layer_prefix)
 
 
 def read_parquet(parquet_uri: str) -> pd.DataFrame:

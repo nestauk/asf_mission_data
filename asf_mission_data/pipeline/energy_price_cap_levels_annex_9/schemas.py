@@ -39,6 +39,8 @@ GOLD_1C_CONSUMPTION_ADJUSTED_LEVELS_WITH_VAT_SCHEMA = pa.DataFrameSchema(
         "28AD Charge Restriction Period end": Column(pd.Timestamp),
         "28AD Charge Restriction Period interval": Column("interval[datetime64[ns], both]"),
         "metadata": Column(object),
+        "change_from_previous_period": Column(float, nullable=True),
+        "pct_change_from_previous_period": Column(float, nullable=True),
     },
     strict=True,
 )
@@ -58,6 +60,8 @@ GOLD_TARIFF_COMPONENT_RATES_SCHEMA = pa.DataFrameSchema(
         "Unit": Column(str),
         "value": Column(float),
         "metadata": Column(object),
+        "change_from_previous_period": Column(float, nullable=True),
+        "pct_change_from_previous_period": Column(float, nullable=True),
     },
     strict=True,
 )
@@ -71,6 +75,8 @@ GOLD_PRICE_RATIOS_SCHEMA = pa.DataFrameSchema(
         "Variable": Column(str, Check.isin(["Electricity to gas price ratio"])),
         "value": Column(float, nullable=True),
         "metadata": Column(object),
+        "change_from_previous_period": Column(float, nullable=True),
+        "pct_change_from_previous_period": Column(float, nullable=True),
     },
     strict=True,
 )
@@ -90,6 +96,8 @@ GOLD_ANNUAL_BILL_FIXED_AND_VARIABLE_COMPONENT_CONTRIBUTIONS_SCHEMA = pa.DataFram
         "Unit": Column(str),
         "value": Column(float),
         "metadata": Column(object),
+        "change_from_previous_period": Column(float, nullable=True),
+        "pct_change_from_previous_period": Column(float, nullable=True),
     },
     strict=True,
 )
