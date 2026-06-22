@@ -32,7 +32,7 @@ def bronze_heat_pump_deployment_statistics_file(dataset_prefix: str) -> str:
     Returns:
         str: URI or file path to the latest bronze Excel file.
     """
-    return storage.locate_latest_bronze(dataset_prefix, "file")
+    return storage.locate_latest(dataset_prefix, "file", "bronze")
 
 
 def bronze_heat_pump_deployment_statistics_metadata(dataset_prefix: str) -> dict[str, str]:
@@ -44,7 +44,7 @@ def bronze_heat_pump_deployment_statistics_metadata(dataset_prefix: str) -> dict
     Returns:
         dict: Dictionary containing metadata fields such as publication date and source information.
     """
-    metadata_uri = storage.locate_latest_bronze(dataset_prefix, "metadata")
+    metadata_uri = storage.locate_latest(dataset_prefix, "metadata", "bronze")
     return storage.read_json(metadata_uri)
 
 

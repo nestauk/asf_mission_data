@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 def silver_energy_price_cap_annex_9_dataset(dataset_prefix: str, silver_table_prefix: str) -> str:
     """Latest silver-level dataset for Energy Price Cap Annex 9."""
-    return storage.locate_latest_silver(dataset_prefix, silver_table_prefix)
+    return storage.locate_latest(dataset_prefix, silver_table_prefix, "silver")
 
 
 def silver_df(silver_energy_price_cap_annex_9_dataset: str) -> pd.DataFrame:

@@ -27,7 +27,7 @@ logger = setup_logging(__name__)
 
 def bronze_energy_price_cap_annex_9_file(dataset_prefix: str) -> str:
     """Latest bronze-level dataset for Energy Price Cap Annex 9."""
-    return storage.locate_latest_bronze(dataset_prefix, "file")
+    return storage.locate_latest(dataset_prefix, "file", "bronze")
 
 
 def excel_sheet_df(bronze_energy_price_cap_annex_9_file: str, sheet_name: str) -> pd.DataFrame:
@@ -37,7 +37,7 @@ def excel_sheet_df(bronze_energy_price_cap_annex_9_file: str, sheet_name: str) -
 
 def bronze_energy_price_cap_annex_9_metadata(dataset_prefix: str) -> dict:
     """Load metadata associated with the latest bronze dataset."""
-    metadata_uri = storage.locate_latest_bronze(dataset_prefix, "metadata")
+    metadata_uri = storage.locate_latest(dataset_prefix, "metadata", "bronze")
     return storage.read_json(metadata_uri)
 
 
