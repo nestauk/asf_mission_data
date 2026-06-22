@@ -4,6 +4,13 @@ import pandas as pd
 import pandera.pandas as pa
 from pandera import Check, Column
 
+from asf_mission_data.pipeline.heat_pump_deployment_statistics.config import (
+    AREA_CODES,
+    GEOGRAPHIC_LEVELS,
+    TABLE_1_1_VALUE_VARS,
+    TABLE_1_2_VALUE_VARS,
+)
+
 # Names-only schema
 WIDE_TABLE_1_1_SCHEMA = pa.DataFrameSchema(
     {
@@ -13,9 +20,7 @@ WIDE_TABLE_1_1_SCHEMA = pa.DataFrameSchema(
             "Installation quarter start",
             "Installation quarter end",
             "Notes",
-            "Air source heat pump installations",
-            "Ground/water source heat pump installations",
-            "Total heat pump installations",
+            *TABLE_1_1_VALUE_VARS,
         ]
     },
     strict=True,
@@ -23,21 +28,11 @@ WIDE_TABLE_1_1_SCHEMA = pa.DataFrameSchema(
 
 SILVER_TABLE_1_1_SCHEMA = pa.DataFrameSchema(
     {
-        "Installation quarter": Column(str, nullable=False),
-        "Installation quarter start": Column(pd.Timestamp, nullable=False),
-        "Installation quarter end": Column(pd.Timestamp, nullable=False),
-        "Notes": Column(str, nullable=True),
-        "Type": Column(
-            str,
-            nullable=False,
-            checks=Check.isin(
-                [
-                    "Air source heat pump installations",
-                    "Ground/water source heat pump installations",
-                    "Total heat pump installations",
-                ]
-            ),
-        ),
+        "installation_quarter": Column(str, nullable=False),
+        "installation_quarter_start": Column(pd.Timestamp, nullable=False),
+        "installation_quarter_end": Column(pd.Timestamp, nullable=False),
+        "notes": Column(str, nullable=True),
+        "type": Column(str, nullable=False, checks=Check.isin(TABLE_1_1_VALUE_VARS)),
         "value": Column(int, nullable=False, checks=Check.ge(0)),
         "metadata": Column(object, nullable=False),
     },
@@ -50,22 +45,7 @@ WIDE_TABLE_1_2_SCHEMA = pa.DataFrameSchema(
         col: Column(None, nullable=True)
         for col in [
             "Installation quarter",
-            "United Kingdom",
-            "England and Wales",
-            "England",
-            "North East",
-            "North West",
-            "Yorkshire and The Humber",
-            "East Midlands",
-            "West Midlands",
-            "East",
-            "London",
-            "South East",
-            "South West",
-            "Wales",
-            "Scotland",
-            "Northern Ireland",
-            "Unknown",
+            *TABLE_1_2_VALUE_VARS,
             "Notes",
             "Installation quarter start",
             "Installation quarter end",
@@ -76,58 +56,15 @@ WIDE_TABLE_1_2_SCHEMA = pa.DataFrameSchema(
 
 SILVER_TABLE_1_2_SCHEMA = pa.DataFrameSchema(
     {
-        "Installation quarter": Column(str, nullable=False),
-        "Installation quarter start": Column(pd.Timestamp, nullable=False),
-        "Installation quarter end": Column(pd.Timestamp, nullable=False),
-        "Notes": Column(str, nullable=True),
-        "Country or Region": Column(
-            str,
-            nullable=False,
-            checks=Check.isin(
-                [
-                    "United Kingdom",
-                    "England and Wales",
-                    "England",
-                    "North East",
-                    "North West",
-                    "Yorkshire and The Humber",
-                    "East Midlands",
-                    "West Midlands",
-                    "East",
-                    "London",
-                    "South East",
-                    "South West",
-                    "Wales",
-                    "Scotland",
-                    "Northern Ireland",
-                    "Unknown",
-                ]
-            ),
-        ),
+        "installation_quarter": Column(str, nullable=False),
+        "installation_quarter_start": Column(pd.Timestamp, nullable=False),
+        "installation_quarter_end": Column(pd.Timestamp, nullable=False),
+        "notes": Column(str, nullable=True),
+        "country_or_region": Column(str, nullable=False, checks=Check.isin(TABLE_1_2_VALUE_VARS)),
         "value": Column(int, nullable=False, checks=Check.ge(0)),
         "metadata": Column(object, nullable=False),
-        "Area code": Column(
-            str,
-            nullable=False,
-            checks=Check.isin(
-                [
-                    "K02000001",
-                    "N/A",
-                    "E92000001",
-                    "E12000001",
-                    "E12000002",
-                    "E12000004",
-                    "E12000005",
-                    "E12000006",
-                    "E12000007",
-                    "E12000008",
-                    "E12000009",
-                    "W92000004",
-                    "S92000003",
-                    "N92000002",
-                ]
-            ),
-        ),
+        "area_code": Column(str, nullable=False, checks=Check.isin(AREA_CODES)),
+        "geographic_level": Column(str, nullable=False, checks=Check.isin(GEOGRAPHIC_LEVELS)),
     },
     strict=True,
 )

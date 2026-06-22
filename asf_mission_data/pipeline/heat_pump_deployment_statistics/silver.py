@@ -5,6 +5,12 @@ from hamilton.function_modifiers import check_output, check_output_custom
 
 from asf_mission_data import storage, utils
 from asf_mission_data.logging_utils import setup_logging
+from asf_mission_data.pipeline.heat_pump_deployment_statistics.config import (
+    AREA_CODES_LOOKUP,
+    GEOGRAPHIC_LEVEL_MAP,
+    TABLE_1_1_VALUE_VARS,
+    TABLE_1_2_VALUE_VARS,
+)
 from asf_mission_data.pipeline.heat_pump_deployment_statistics.schemas import (
     SILVER_TABLE_1_1_SCHEMA,
     SILVER_TABLE_1_2_SCHEMA,
@@ -36,7 +42,7 @@ def bronze_heat_pump_deployment_statistics_metadata(dataset_prefix: str) -> dict
         pipeline_name (str): Pipeline identifier used to locate metadata.
 
     Returns:
-        dict: Dictionary containing metadata fields such as price cap period and source information.
+        dict: Dictionary containing metadata fields such as publication date and source information.
     """
     metadata_uri = storage.locate_latest_bronze(dataset_prefix, "metadata")
     return storage.read_json(metadata_uri)
@@ -136,6 +142,9 @@ def _add_quarter_dates(df: pd.DataFrame) -> pd.DataFrame:
         pd.DataFrame: Dataframe with added 'Installation quarter start' and 'Installation
             quarter end' timestamp columns.
     """
+    if "Installation quarter" not in df.columns:
+        raise ValueError("Expected column 'Installation quarter' not found. Has the source file structure changed?")
+
     df = df.copy()
 
     q_start = {"Q1": 1, "Q2": 4, "Q3": 7, "Q4": 10}
@@ -226,7 +235,10 @@ def table_1_1_df_cleaned(table_1_1_df_raw: pd.DataFrame, table_1_1_name: str) ->
 
 def table_1_1_with_notes_df(table_1_1_df_cleaned: pd.DataFrame, notes_lookup: dict) -> pd.DataFrame:
     """Cleaned dataframe with a publisher 'Notes' column."""
-    return _apply_notes(table_1_1_df_cleaned, notes_lookup)
+    df = _apply_notes(table_1_1_df_cleaned, notes_lookup)
+    if df["Notes"].str.strip().eq("").all():
+        raise ValueError("Notes column is entirely empty: notes lookup may have failed to match. Has the source file structure changed?")
+    return df
 
 
 @check_output(schema=WIDE_TABLE_1_1_SCHEMA, importance="fail")  # names-only schema ensures valid id_vars and value_vars for melting
@@ -240,8 +252,7 @@ def table_1_1_df_melted(table_1_1_df_datetime_quarters: pd.DataFrame) -> pd.Data
     """Table 1.1 data in tidy format."""
     df = table_1_1_df_datetime_quarters.copy()
     id_vars = ["Installation quarter", "Installation quarter start", "Installation quarter end", "Notes"]
-    value_vars = ["Air source heat pump installations", "Ground/water source heat pump installations", "Total heat pump installations"]
-    return pd.melt(df, id_vars=id_vars, value_vars=value_vars, var_name="Type", value_name="value")
+    return pd.melt(df, id_vars=id_vars, value_vars=TABLE_1_1_VALUE_VARS, var_name="Type", value_name="value")
 
 
 @check_output(schema=SILVER_TABLE_1_1_SCHEMA, importance="fail")
@@ -255,7 +266,7 @@ def silver_table_1_1_df(
     df = table_1_1_df_melted.copy()
     df["value"] = df["value"].astype(int)
     df = _append_metadata(df, bronze_heat_pump_deployment_statistics_metadata, table_1_1_name, table_1_1_data_source)
-    return df
+    return utils.standardise_column_names(df)
 
 
 def silver_heat_pump_deployment_statistics_table_1_1_parquet(
@@ -303,26 +314,6 @@ def table_1_2_data_source(table_1_2_df_raw: pd.DataFrame) -> str:
     return table_1_2_df_raw.loc[mask].iloc[0, 0]
 
 
-def area_codes_lookup(table_1_2_df_raw: pd.DataFrame) -> dict[str, str]:
-    """Create lookup dictionary for country/region and corresponding area code.
-
-    Args:
-        table_1_2_df_raw (pd.DataFrame): Raw Table 1.2 sheet dataframe.
-
-    Returns:
-        dict[str, str]: Dictionary containing country/region and area code as key-value pairs.
-    """
-    area_codes_row = table_1_2_df_raw[table_1_2_df_raw[table_1_2_name].str.contains("Area Codes and Country or Region", na=False)].index[0]
-    region_names_row = table_1_2_df_raw[table_1_2_df_raw[table_1_2_name].str.contains("Installation quarter", na=False)].index[0]
-    area_codes = table_1_2_df_raw.iloc[area_codes_row, 1:]  # skip first column (header)
-    region_names = table_1_2_df_raw.iloc[region_names_row, 1:]  # skip first column
-    region_names = region_names.str.replace("\n", " ", regex=True).str.strip()
-    mask = area_codes.notna()
-    area_codes = area_codes[mask]
-    region_names = region_names[mask]
-    return dict(zip(region_names, area_codes, strict=False))
-
-
 def table_1_2_df_cleaned(table_1_2_df_raw: pd.DataFrame, table_1_2_name: str) -> pd.DataFrame:
     """Cleaned dataframe containing only target data and stripped column names."""
     return _clean_table(table_1_2_df_raw, table_1_2_name)
@@ -344,25 +335,7 @@ def table_1_2_df_melted(table_1_2_df_datetime_quarters: pd.DataFrame) -> pd.Data
     """Table 1.2 data in tidy format."""
     df = table_1_2_df_datetime_quarters.copy()
     id_vars = ["Installation quarter", "Installation quarter start", "Installation quarter end", "Notes"]
-    value_vars = [
-        "United Kingdom",
-        "England and Wales",
-        "England",
-        "North East",
-        "North West",
-        "Yorkshire and The Humber",
-        "East Midlands",
-        "West Midlands",
-        "East",
-        "London",
-        "South East",
-        "South West",
-        "Wales",
-        "Scotland",
-        "Northern Ireland",
-        "Unknown",
-    ]
-    return pd.melt(df, id_vars=id_vars, value_vars=value_vars, var_name="Country or Region", value_name="value")
+    return pd.melt(df, id_vars=id_vars, value_vars=TABLE_1_2_VALUE_VARS, var_name="country_or_region", value_name="value")
 
 
 @check_output(schema=SILVER_TABLE_1_2_SCHEMA, importance="fail")
@@ -371,15 +344,15 @@ def silver_table_1_2_df(
     bronze_heat_pump_deployment_statistics_metadata: dict[str, str],
     table_1_2_name: str,
     table_1_2_data_source: str,
-    area_codes_lookup: dict[str, str],
 ) -> pd.DataFrame:
-    """Silver dataframe for Table 1.1 with silver-layer enriched metadata and supporting area code column.
+    """Silver dataframe for Table 1.2 with silver-layer enriched metadata and supporting area code column.
     Area code field is added back in to ensure consistency with other regional datasets."""
     df = table_1_2_df_melted.copy()
     df["value"] = df["value"].astype(int)
     df = _append_metadata(df, bronze_heat_pump_deployment_statistics_metadata, table_1_2_name, table_1_2_data_source)
-    df["Area code"] = df["Country or Region"].map(area_codes_lookup).fillna("N/A")
-    return df
+    df["area_code"] = df["country_or_region"].map(AREA_CODES_LOOKUP).fillna("N/A")
+    df["geographic_level"] = df["country_or_region"].map(GEOGRAPHIC_LEVEL_MAP)
+    return utils.standardise_column_names(df)
 
 
 def silver_heat_pump_deployment_statistics_table_1_2_parquet(
