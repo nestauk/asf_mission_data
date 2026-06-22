@@ -7,10 +7,6 @@ import warnings
 
 DEFAULT_LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s - %(message)s"
 
-# Pandera is pinned to typeguard 2.x which only validates the first element of
-# generic collections; suppress the warning until the constraint is lifted
-warnings.filterwarnings("ignore", category=UserWarning, module="pandera")
-
 
 def configure_logging(
     log_level: str = "INFO",
@@ -44,3 +40,4 @@ def configure_logging(
     logging.getLogger("hamilton").setLevel(logging.WARNING)
     logging.getLogger("s3fs").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
+    warnings.filterwarnings("ignore", category=UserWarning, module="pandera")
