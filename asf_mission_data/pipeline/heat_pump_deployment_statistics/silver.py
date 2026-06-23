@@ -71,7 +71,9 @@ def notes_lookup(
     df.columns = notes_df.iloc[header_row]
     df = df.reset_index(drop=True)
     df.columns.name = None
-    return dict(zip(df["Note number"], df["Note text"], strict=False))
+    notes = dict(zip(df["Note number"], df["Note text"], strict=False))
+    logger.debug("Loaded %d heat pump notes from workbook", len(notes))
+    return notes
 
 
 def latest_publication_date(
@@ -300,7 +302,21 @@ def silver_table_1_1_df(
         table_1_1_name,
         table_1_1_data_source,
     )
-    return utils.standardise_column_names(df)
+    df = utils.standardise_column_names(df)
+
+    logger.info(
+        "Produced silver table 'table_1_1': rows=%d quarters=%d types=%d null_values=%d",
+        len(df),
+        df["installation_quarter"].nunique(),
+        df["type"].nunique(),
+        int(df["value"].isna().sum()),
+    )
+    logger.debug(
+        "Silver table 'table_1_1' rows by type: %s",
+        df["type"].value_counts(dropna=False).to_dict(),
+    )
+
+    return df
 
 
 def silver_heat_pump_deployment_statistics_table_1_1_parquet(
@@ -409,7 +425,21 @@ def silver_table_1_2_df(
     )
     df["area_code"] = df["country_or_region"].map(AREA_CODES_LOOKUP).fillna("N/A")
     df["geographic_level"] = df["country_or_region"].map(GEOGRAPHIC_LEVEL_MAP)
-    return utils.standardise_column_names(df)
+    df = utils.standardise_column_names(df)
+
+    logger.info(
+        "Produced silver table 'table_1_2': rows=%d quarters=%d regions=%d null_values=%d",
+        len(df),
+        df["installation_quarter"].nunique(),
+        df["country_or_region"].nunique(),
+        int(df["value"].isna().sum()),
+    )
+    logger.debug(
+        "Silver table 'table_1_2' rows by geographic level: %s",
+        df["geographic_level"].value_counts(dropna=False).to_dict(),
+    )
+
+    return df
 
 
 def silver_heat_pump_deployment_statistics_table_1_2_parquet(

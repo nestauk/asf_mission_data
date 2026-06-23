@@ -25,13 +25,15 @@ def latest_release_api_response(collection_url: str) -> dict:
 
 def latest_release_page_url(latest_release_api_response: dict) -> str:
     """Extract the URL of the latest release page."""
-    return utils.safe_get_govuk_response(
+    release_page_url = utils.safe_get_govuk_response(
         latest_release_api_response,
         "links",
         "available_translations",
         0,
         "web_url",
     )
+    logger.info("Selected heat pump release page URL: %s", release_page_url)
+    return release_page_url
 
 
 def latest_file_url(
@@ -41,7 +43,9 @@ def latest_file_url(
     """Extract the latest Excel file URL from the GOV.UK Content API response."""
     attachments = utils.safe_get_govuk_response(latest_release_api_response, "details", "attachments")
     try:
-        return next(a["url"] for a in attachments if a["content_type"] == file_content_type)
+        file_url = next(a["url"] for a in attachments if a["content_type"] == file_content_type)
+        logger.info("Selected heat pump source file URL: %s", file_url)
+        return file_url
     except StopIteration as e:
         raise ValueError(f"Could not find attachment with content type '{file_content_type}'") from e
 
@@ -54,7 +58,9 @@ def latest_file_content(latest_file_url: str) -> bytes:
 @check_output_custom(ExcelFileExtensionValidator())
 def latest_filename(latest_file_url: str) -> str:
     """Extract file name of downloaded data file."""
-    return Path(latest_file_url).name
+    filename = Path(latest_file_url).name
+    logger.info("Selected heat pump workbook: %s", filename)
+    return filename
 
 
 @check_output_custom(WithinThreeCalendarMonthsValidator())
@@ -64,7 +70,9 @@ def latest_publication_date(latest_release_api_response: dict) -> str:
     if not change_history:
         raise ValueError("No change history (i.e. publication date) found in API response for latest release.")
     raw = utils.safe_get_govuk_response(change_history, 0, "public_timestamp")
-    return datetime.strptime(raw, "%Y-%m-%dT%H:%M:%SZ").strftime("%d %B %Y")
+    publication_date = datetime.strptime(raw, "%Y-%m-%dT%H:%M:%SZ").strftime("%d %B %Y")
+    logger.info("Detected heat pump publication date: %s", publication_date)
+    return publication_date
 
 
 def bronze_metadata(
@@ -99,6 +107,11 @@ def bronze_heat_pump_deployment_statistics_file(
     bronze_metadata: dict,
 ) -> None:
     """Ingest downloaded data file and accompanying metadata to bronze-layer storage."""
+    logger.info(
+        "Writing heat pump bronze dataset: filename=%s publication_date=%s",
+        latest_filename,
+        latest_publication_date,
+    )
     storage.ingest_to_bronze(
         layer_prefix="bronze",
         dataset_prefix=dataset_prefix,
