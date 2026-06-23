@@ -13,11 +13,17 @@ from hamilton.function_modifiers import (
 )
 
 from asf_mission_data import storage, utils
-from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import MONTH_NORMALISATION, PRICE_CAP_PERIOD_PUBLICATION_DATES
+from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import (
+    MONTH_NORMALISATION,
+    PRICE_CAP_PERIOD_PUBLICATION_DATES,
+)
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.schemas import (
     SILVER_1C_CONSUMPTION_ADJUSTED_LEVELS_SCHEMA,
 )
-from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.validators import ChargeRestrictionPeriodValidator, PriceCapValidator
+from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.validators import (
+    ChargeRestrictionPeriodValidator,
+    PriceCapValidator,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -173,7 +179,12 @@ def raw_payment_method_table_df(excel_sheet_df: pd.DataFrame, payment_method: st
         raise ValueError(f"Slice Error: Expected header '{payment_method}' at top of dataframe slice, but found '{header}'")
 
     logger.debug(
-        "Extracted %s table: rows %s to %s (%d rows, %d columns)", payment_method, start_index, end_index, len(df_slice), len(df_slice.columns)
+        "Extracted %s table: rows %s to %s (%d rows, %d columns)",
+        payment_method,
+        start_index,
+        end_index,
+        len(df_slice),
+        len(df_slice.columns),
     )
 
     return df_slice
@@ -551,6 +562,35 @@ def all_tariff_tables_tidy_with_metadata_df(
     # Non-numeric values (e.g. blank cells) are coerced to NaN intentionally;
     # nullable=True in SILVER_1C_CONSUMPTION_ADJUSTED_LEVELS_SCHEMA allows these through
     df["value"] = pd.to_numeric(df["value"], errors="coerce")
+
+    null_value_count = int(df["value"].isna().sum())
+    unique_periods = sorted(df["28AD Charge Restriction Period"].dropna().unique())
+
+    logger.info(
+        "Produced silver table '%s': rows=%d, unique_charge_restriction_periods=%d, null values=%d",
+        sheet_name,
+        len(df),
+        len(unique_periods),
+        null_value_count,
+    )
+
+    logger.debug(
+        "Silver table '%s' charge restriction periods: %s",
+        sheet_name,
+        unique_periods,
+    )
+
+    logger.debug(
+        "Silver table '%s' rows by payment method: %s",
+        sheet_name,
+        df["Payment method"].value_counts(dropna=False).to_dict(),
+    )
+
+    logger.debug(
+        "Silver table '%s' rows by fuel: %s",
+        sheet_name,
+        df["Fuel"].value_counts(dropna=False).to_dict(),
+    )
 
     string_cols = [
         "Payment method",
