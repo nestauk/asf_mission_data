@@ -3,7 +3,6 @@
 
 import logging
 import sys
-import warnings
 
 DEFAULT_LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s - %(message)s"
 
@@ -33,11 +32,20 @@ def configure_logging(
     root.addHandler(handler)
 
     # Shut up the noisy third-party libraries
+    # Running the pipelines produced a lot of debug
+    # output from third-party libraries, which made it too hard
+    # to get the important info from the logs.
+
+    logging.getLogger("aioboto3").setLevel(logging.WARNING)
+    logging.getLogger("aiobotocore").setLevel(logging.WARNING)
+    logging.getLogger("aiohttp").setLevel(logging.WARNING)
+    logging.getLogger("asyncio").setLevel(logging.WARNING)
     logging.getLogger("boto3").setLevel(logging.WARNING)
     logging.getLogger("botocore").setLevel(logging.WARNING)
     logging.getLogger("fsspec").setLevel(logging.WARNING)
     logging.getLogger("graphviz").setLevel(logging.WARNING)
     logging.getLogger("hamilton").setLevel(logging.WARNING)
     logging.getLogger("s3fs").setLevel(logging.WARNING)
+    logging.getLogger("s3transfer").setLevel(logging.WARNING)
+
     logging.getLogger("urllib3").setLevel(logging.WARNING)
-    warnings.filterwarnings("ignore", category=UserWarning, module="pandera")

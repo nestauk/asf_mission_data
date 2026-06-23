@@ -77,12 +77,17 @@ def test_configure_logging_suppresses_noisy_third_party_loggers(
     configure_logging(log_level="INFO")
 
     for name in [
+        "aioboto3",
+        "aiobotocore",
+        "aiohttp",
+        "asyncio",
         "boto3",
         "botocore",
         "fsspec",
         "graphviz",
         "hamilton",
         "s3fs",
+        "s3transfer",
         "urllib3",
     ]:
         assert logging.getLogger(name).level == logging.WARNING
