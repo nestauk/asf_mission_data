@@ -71,7 +71,10 @@ class WithinThreeCalendarMonthsValidator(DataValidator):
             return ValidationResult(passes=valid, message=message)
 
         except Exception as e:
-            return ValidationResult(passes=False, message=f"Failed to parse date '{data}'. Expected format: 'DD Month YYYY'. Error: {e}")
+            return ValidationResult(
+                passes=False,
+                message=f"Failed to parse date '{data}'. Expected format: 'DD Month YYYY'. Error: {e}",
+            )
 
 
 class StartStringValidator(DataValidator):

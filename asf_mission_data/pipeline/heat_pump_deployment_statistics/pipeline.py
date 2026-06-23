@@ -2,14 +2,17 @@
 Main functions that orchestrate the execution of the pipeline stages.
 """
 
+import logging
 from datetime import datetime, timezone
 from importlib.metadata import version
 
 from hamilton import driver
 
 from asf_mission_data import storage, utils
-from asf_mission_data.logging_utils import setup_logging
-from asf_mission_data.pipeline.heat_pump_deployment_statistics import bronze, silver
+from asf_mission_data.pipeline.heat_pump_deployment_statistics import (
+    bronze,
+    silver,
+)
 from asf_mission_data.pipeline.heat_pump_deployment_statistics.config import (
     COLLECTION_URL,
     DATASET_PREFIX,
@@ -19,7 +22,7 @@ from asf_mission_data.pipeline.heat_pump_deployment_statistics.config import (
     SILVER_TABLES_NODES_MAP,
 )
 
-logger = setup_logging(__name__)
+logger = logging.getLogger(__name__)
 
 
 def build_bronze_driver() -> driver.Driver:
@@ -54,7 +57,11 @@ def run_bronze_pipeline() -> None:
     """
     dr = build_bronze_driver()
 
-    node_targets = ["bronze_heat_pump_deployment_statistics_file", "latest_filename", "latest_publication_date"]
+    node_targets = [
+        "bronze_heat_pump_deployment_statistics_file",
+        "latest_filename",
+        "latest_publication_date",
+    ]
     results = dr.execute(node_targets)
 
     # generate dag image

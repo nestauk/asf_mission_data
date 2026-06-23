@@ -1,10 +1,11 @@
 """Hamilton nodes for silver-layer of the Heat Pump Deployment Statistics pipeline"""
 
+import logging
+
 import pandas as pd
 from hamilton.function_modifiers import check_output, check_output_custom
 
 from asf_mission_data import storage, utils
-from asf_mission_data.logging_utils import setup_logging
 from asf_mission_data.pipeline.heat_pump_deployment_statistics.config import (
     AREA_CODES_LOOKUP,
     GEOGRAPHIC_LEVEL_MAP,
@@ -17,9 +18,11 @@ from asf_mission_data.pipeline.heat_pump_deployment_statistics.schemas import (
     WIDE_TABLE_1_1_SCHEMA,
     WIDE_TABLE_1_2_SCHEMA,
 )
-from asf_mission_data.pipeline.heat_pump_deployment_statistics.validators import StartStringValidator
+from asf_mission_data.pipeline.heat_pump_deployment_statistics.validators import (
+    StartStringValidator,
+)
 
-logger = setup_logging(__name__)
+logger = logging.getLogger(__name__)
 
 
 # Common silver nodes
@@ -35,7 +38,9 @@ def bronze_heat_pump_deployment_statistics_file(dataset_prefix: str) -> str:
     return storage.locate_latest(dataset_prefix, "file", "bronze")
 
 
-def bronze_heat_pump_deployment_statistics_metadata(dataset_prefix: str) -> dict[str, str]:
+def bronze_heat_pump_deployment_statistics_metadata(
+    dataset_prefix: str,
+) -> dict[str, str]:
     """Load metadata associated with the latest bronze dataset.
 
     Args:
@@ -48,7 +53,9 @@ def bronze_heat_pump_deployment_statistics_metadata(dataset_prefix: str) -> dict
     return storage.read_json(metadata_uri)
 
 
-def notes_lookup(bronze_heat_pump_deployment_statistics_file: str) -> dict[str, str]:
+def notes_lookup(
+    bronze_heat_pump_deployment_statistics_file: str,
+) -> dict[str, str]:
     """Create lookup for the numbered 'Notes' in the Heat Pump Deployment Statistics Excel workbook.
     'Notes' are located in a separate sheet from the data tables.
 
@@ -67,7 +74,9 @@ def notes_lookup(bronze_heat_pump_deployment_statistics_file: str) -> dict[str, 
     return dict(zip(df["Note number"], df["Note text"], strict=False))
 
 
-def latest_publication_date(bronze_heat_pump_deployment_statistics_metadata: dict[str, str]) -> str:
+def latest_publication_date(
+    bronze_heat_pump_deployment_statistics_metadata: dict[str, str],
+) -> str:
     """Return publication date of latest bronze file from metadata."""
     return bronze_heat_pump_deployment_statistics_metadata.get("publication_date")
 
@@ -167,7 +176,12 @@ def _add_quarter_dates(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _append_metadata(df: pd.DataFrame, metadata: dict[str, str], table_name: str, data_source: str) -> pd.DataFrame:
+def _append_metadata(
+    df: pd.DataFrame,
+    metadata: dict[str, str],
+    table_name: str,
+    data_source: str,
+) -> pd.DataFrame:
     """Add 'metadata' column, populated with an enriched metadata dictionary to include silver table-specific
         fields. Each row has the same metadata dict attached.
 
@@ -242,17 +256,32 @@ def table_1_1_with_notes_df(table_1_1_df_cleaned: pd.DataFrame, notes_lookup: di
 
 
 @check_output(schema=WIDE_TABLE_1_1_SCHEMA, importance="fail")  # names-only schema ensures valid id_vars and value_vars for melting
-def table_1_1_df_datetime_quarters(table_1_1_with_notes_df: pd.DataFrame) -> pd.DataFrame:
+def table_1_1_df_datetime_quarters(
+    table_1_1_with_notes_df: pd.DataFrame,
+) -> pd.DataFrame:
     """Cleaned dataframe with added 'Installation quarter start' and 'Installation quarter
     end' timestamp columns."""
     return _add_quarter_dates(table_1_1_with_notes_df)
 
 
-def table_1_1_df_melted(table_1_1_df_datetime_quarters: pd.DataFrame) -> pd.DataFrame:
+def table_1_1_df_melted(
+    table_1_1_df_datetime_quarters: pd.DataFrame,
+) -> pd.DataFrame:
     """Table 1.1 data in tidy format."""
     df = table_1_1_df_datetime_quarters.copy()
-    id_vars = ["Installation quarter", "Installation quarter start", "Installation quarter end", "Notes"]
-    return pd.melt(df, id_vars=id_vars, value_vars=TABLE_1_1_VALUE_VARS, var_name="Type", value_name="value")
+    id_vars = [
+        "Installation quarter",
+        "Installation quarter start",
+        "Installation quarter end",
+        "Notes",
+    ]
+    return pd.melt(
+        df,
+        id_vars=id_vars,
+        value_vars=TABLE_1_1_VALUE_VARS,
+        var_name="Type",
+        value_name="value",
+    )
 
 
 @check_output(schema=SILVER_TABLE_1_1_SCHEMA, importance="fail")
@@ -265,12 +294,20 @@ def silver_table_1_1_df(
     """Silver dataframe for Table 1.1 with silver-layer enriched metadata."""
     df = table_1_1_df_melted.copy()
     df["value"] = df["value"].astype(int)
-    df = _append_metadata(df, bronze_heat_pump_deployment_statistics_metadata, table_1_1_name, table_1_1_data_source)
+    df = _append_metadata(
+        df,
+        bronze_heat_pump_deployment_statistics_metadata,
+        table_1_1_name,
+        table_1_1_data_source,
+    )
     return utils.standardise_column_names(df)
 
 
 def silver_heat_pump_deployment_statistics_table_1_1_parquet(
-    silver_table_1_1_df: pd.DataFrame, dataset_prefix: str, latest_publication_date: str, sheet_name: str
+    silver_table_1_1_df: pd.DataFrame,
+    dataset_prefix: str,
+    latest_publication_date: str,
+    sheet_name: str,
 ) -> None:
     """Ingested table to silver-layer storage for Table 1.1 as parquet file."""
     storage.ingest_to_silver(
@@ -325,17 +362,32 @@ def table_1_2_with_notes_df(table_1_2_df_cleaned: pd.DataFrame, notes_lookup: di
 
 
 @check_output(schema=WIDE_TABLE_1_2_SCHEMA, importance="fail")  # names-only schema ensures valid id_vars and value_vars for melting
-def table_1_2_df_datetime_quarters(table_1_2_with_notes_df: pd.DataFrame) -> pd.DataFrame:
+def table_1_2_df_datetime_quarters(
+    table_1_2_with_notes_df: pd.DataFrame,
+) -> pd.DataFrame:
     """Cleaned dataframe with added 'Installation quarter start' and 'Installation quarter
     end' timestamp columns."""
     return _add_quarter_dates(table_1_2_with_notes_df)
 
 
-def table_1_2_df_melted(table_1_2_df_datetime_quarters: pd.DataFrame) -> pd.DataFrame:
+def table_1_2_df_melted(
+    table_1_2_df_datetime_quarters: pd.DataFrame,
+) -> pd.DataFrame:
     """Table 1.2 data in tidy format."""
     df = table_1_2_df_datetime_quarters.copy()
-    id_vars = ["Installation quarter", "Installation quarter start", "Installation quarter end", "Notes"]
-    return pd.melt(df, id_vars=id_vars, value_vars=TABLE_1_2_VALUE_VARS, var_name="country_or_region", value_name="value")
+    id_vars = [
+        "Installation quarter",
+        "Installation quarter start",
+        "Installation quarter end",
+        "Notes",
+    ]
+    return pd.melt(
+        df,
+        id_vars=id_vars,
+        value_vars=TABLE_1_2_VALUE_VARS,
+        var_name="country_or_region",
+        value_name="value",
+    )
 
 
 @check_output(schema=SILVER_TABLE_1_2_SCHEMA, importance="fail")
@@ -349,14 +401,22 @@ def silver_table_1_2_df(
     Area code field is added back in to ensure consistency with other regional datasets."""
     df = table_1_2_df_melted.copy()
     df["value"] = df["value"].astype(int)
-    df = _append_metadata(df, bronze_heat_pump_deployment_statistics_metadata, table_1_2_name, table_1_2_data_source)
+    df = _append_metadata(
+        df,
+        bronze_heat_pump_deployment_statistics_metadata,
+        table_1_2_name,
+        table_1_2_data_source,
+    )
     df["area_code"] = df["country_or_region"].map(AREA_CODES_LOOKUP).fillna("N/A")
     df["geographic_level"] = df["country_or_region"].map(GEOGRAPHIC_LEVEL_MAP)
     return utils.standardise_column_names(df)
 
 
 def silver_heat_pump_deployment_statistics_table_1_2_parquet(
-    silver_table_1_2_df: pd.DataFrame, dataset_prefix: str, latest_publication_date: str, sheet_name: str
+    silver_table_1_2_df: pd.DataFrame,
+    dataset_prefix: str,
+    latest_publication_date: str,
+    sheet_name: str,
 ) -> str:
     """Ingested table to silver-layer storage for Table 1.2 as parquet file."""
     storage.ingest_to_silver(

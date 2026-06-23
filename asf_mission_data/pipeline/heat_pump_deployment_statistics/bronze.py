@@ -1,15 +1,18 @@
 """Hamilton nodes for bronze-layer of the Heat Pump Deployment Statistics pipeline"""
 
+import logging
 from datetime import datetime
 from pathlib import Path
 
 from hamilton.function_modifiers import check_output_custom
 
 from asf_mission_data import storage, utils
-from asf_mission_data.logging_utils import setup_logging
-from asf_mission_data.pipeline.heat_pump_deployment_statistics.validators import ExcelFileExtensionValidator, WithinThreeCalendarMonthsValidator
+from asf_mission_data.pipeline.heat_pump_deployment_statistics.validators import (
+    ExcelFileExtensionValidator,
+    WithinThreeCalendarMonthsValidator,
+)
 
-logger = setup_logging(__name__)
+logger = logging.getLogger(__name__)
 
 
 def latest_release_api_response(collection_url: str) -> dict:
@@ -22,11 +25,18 @@ def latest_release_api_response(collection_url: str) -> dict:
 
 def latest_release_page_url(latest_release_api_response: dict) -> str:
     """Extract the URL of the latest release page."""
-    return utils.safe_get_govuk_response(latest_release_api_response, "links", "available_translations", 0, "web_url")
+    return utils.safe_get_govuk_response(
+        latest_release_api_response,
+        "links",
+        "available_translations",
+        0,
+        "web_url",
+    )
 
 
 def latest_file_url(
-    latest_release_api_response: dict, file_content_type: str = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    latest_release_api_response: dict,
+    file_content_type: str = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ) -> str:
     """Extract the latest Excel file URL from the GOV.UK Content API response."""
     attachments = utils.safe_get_govuk_response(latest_release_api_response, "details", "attachments")
