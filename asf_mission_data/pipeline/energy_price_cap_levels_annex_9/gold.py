@@ -10,7 +10,11 @@ from hamilton.function_modifiers import (
 )
 
 from asf_mission_data import storage, utils
-from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import BENCHMARK_CONSUMPTION, COMPONENT_CATEGORY_MAP, VAT
+from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import (
+    BENCHMARK_CONSUMPTION,
+    COMPONENT_CATEGORY_MAP,
+    VAT,
+)
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.schemas import (
     GOLD_1C_CONSUMPTION_ADJUSTED_LEVELS_WITH_VAT_SCHEMA,
     GOLD_ANNUAL_BILL_FIXED_AND_VARIABLE_COMPONENT_CONTRIBUTIONS_SCHEMA,
@@ -144,7 +148,10 @@ def gold_1c_consumption_adjusted_levels_with_vat_df(
     df["pct_change_from_previous_period"] = (
         df.groupby(["Tariff component", "Fuel", "Payment method", "Consumption"])["value"].pct_change().mul(100).round(2)
     )
-
+    logger.info(
+        "Produced gold table '1c_consumption_adjusted_levels_with_vat': rows=%d",
+        len(df),
+    )
     return df
 
 
@@ -299,7 +306,7 @@ def gold_tariff_component_rates_df(
     df["pct_change_from_previous_period"] = (
         df.groupby(["Tariff component", "Fuel", "Payment method", "Type"])["value"].pct_change().mul(100).round(2)
     )
-
+    logger.info("Produced gold table 'tariff_component_rates': rows=%d", len(df))
     return df
 
 
@@ -419,6 +426,20 @@ def gold_price_ratios_df(total_unit_rates_df: pd.DataFrame, silver_df: pd.DataFr
     df = df.sort_values("28AD Charge Restriction Period start")
     df["change_from_previous_period"] = df.groupby(["Payment method"])["value"].diff()
     df["pct_change_from_previous_period"] = df.groupby(["Payment method"])["value"].pct_change().mul(100).round(2)
+
+    null_ratio_count = int(df["value"].isna().sum())
+
+    logger.info(
+        "Produced gold table 'price_ratios': rows=%d, null_ratios=%d",
+        len(df),
+        null_ratio_count,
+    )
+
+    if null_ratio_count:
+        logger.warning(
+            "Gold table 'price_ratios' contains %d null electricity-to-gas ratios.",
+            null_ratio_count,
+        )
 
     return df.reset_index(drop=True)
 
@@ -581,7 +602,10 @@ def gold_annual_bill_fixed_and_variable_component_contributions_df(
     df["pct_change_from_previous_period"] = (
         df.groupby(["Tariff component", "Fuel", "Payment method", "Type"])["value"].pct_change().mul(100).round(2)
     )
-
+    logger.info(
+        "Produced gold table 'annual_bill_fixed_and_variable_component_contributions': rows=%d",
+        len(df),
+    )
     return df
 
 
