@@ -43,7 +43,9 @@ def latest_file_url(
 
     for a in latest_collection_page_html_soup.find_all("a", href=True):
         if file_link_text in a.get_text():
-            return urljoin(collection_url, a["href"])
+            file_url = urljoin(collection_url, a["href"])
+            logger.info("Selected Annex 9 source file URL: %s", file_url)
+            return file_url
 
     raise ValueError(f"Could not find dataset '{file_link_text}' at {collection_url}")
 
@@ -63,7 +65,9 @@ def latest_price_cap_period(
     for heading in latest_collection_page_html_soup.find_all(["h2", "h3"]):
         match = re.compile(PRICE_CAP_PERIOD_STRING_PATTERN).search(heading.get_text(strip=True))
         if match:
-            return match.group(0)
+            period = match.group(0)
+            logger.info("Detected latest price cap period: %s", period)
+            return period
 
     raise ValueError("Could not find latest price cap period on page.")
 
@@ -83,6 +87,7 @@ def latest_filename(
     filename = Path(latest_file_url).name
     if not filename:
         raise ValueError(f"Could not extract filename from URL: {latest_file_url}")
+    logger.info("Selected Annex 9 workbook: %s", filename)
     return filename
 
 
@@ -122,11 +127,19 @@ def bronze_energy_price_cap_annex_9_file(
     bronze_metadata: dict,
 ) -> None:
     """Ingest downloaded data file and accompanying metadata to bronze-layer storage."""
+
+    date_stamp = f"period={utils.normalise_energy_price_cap_period_string(latest_price_cap_period)}"
+
+    logger.info(
+        "Writing Annex 9 bronze dataset: filename=%s, period=%s",
+        latest_filename,
+        date_stamp,
+    )
     storage.ingest_to_bronze(
         layer_prefix="bronze",
         dataset_prefix=dataset_prefix,
         file=latest_file_content,
         filename=latest_filename,
-        date_stamp=f"period={utils.normalise_energy_price_cap_period_string(latest_price_cap_period)}",
+        date_stamp=date_stamp,
         metadata=bronze_metadata,
     )
