@@ -1,40 +1,93 @@
 import logging
-from pathlib import Path
 
 import pytest
 
-from asf_mission_data.logging_utils import setup_logging
+from asf_mission_data.logging_utils import configure_logging
 
 
-def test_setup_logging_configures_requested_level() -> None:
-    logger = setup_logging("tests.logging.level", log_level="WARNING")
+@pytest.fixture
+def restore_logging_state():
+    """
+    Snapshot and restore logging state
 
-    assert logger.level == logging.WARNING
-    assert logger.propagate is False
-    assert len(logger.handlers) == 1
+    configure_logging() clears root handlers
+    and changes logger levels globally. The
+    tests should restore the previous root level,
+    handlers, third-party logger levels, and
+    any other logging state after each test to
+    avoid side effects.
+    """
+    root = logging.getLogger()
+    original_root_level = root.level
+    original_handlers = root.handlers[:]
+
+    third_party_loggers = [
+        "boto3",
+        "botocore",
+        "fsspec",
+        "graphviz",
+        "hamilton",
+        "s3fs",
+        "urllib3",
+    ]
+    original_levels = {name: logging.getLogger(name).level for name in third_party_loggers}
+
+    yield
+
+    root.handlers.clear()
+    root.handlers.extend(original_handlers)
+    root.setLevel(original_root_level)
+
+    for name, level in original_levels.items():
+        logging.getLogger(name).setLevel(level)
 
 
-def test_setup_logging_resets_existing_handlers() -> None:
-    logger = logging.getLogger("tests.logging.reset")
-    logger.addHandler(logging.NullHandler())
+def test_configure_logging_sets_root_level(restore_logging_state):
+    """Test that configure_logging sets the root logger level correctly."""
 
-    configured_logger = setup_logging("tests.logging.reset")
+    configure_logging(log_level="WARNING")
 
-    assert configured_logger is logger
-    assert len(configured_logger.handlers) == 1
-    assert isinstance(configured_logger.handlers[0], logging.StreamHandler)
+    assert logging.getLogger().level == logging.WARNING
 
 
-def test_setup_logging_adds_optional_file_handler(tmp_path: Path) -> None:
-    log_file = tmp_path / "pipeline.log"
-    logger = setup_logging("tests.logging.file", log_filename=str(log_file))
+def test_configure_logging_rejects_invalid_level(restore_logging_state):
+    """Test that configure_logging raises ValueError for an invalid log level."""
 
-    logger.info("hello from the file handler")
-
-    assert len(logger.handlers) == 2
-    assert "hello from the file handler" in log_file.read_text()
-
-
-def test_setup_logging_rejects_invalid_level() -> None:
     with pytest.raises(ValueError, match="Invalid log level"):
-        setup_logging("tests.logging.invalid", log_level="LOUD")
+        configure_logging(log_level="INVALID_LEVEL")
+
+
+def test_configure_logging_doesnt_accumulate_handlers(restore_logging_state):
+    """Multiple calls shouldn't add multiple handlers"""
+
+    configure_logging(log_level="INFO")
+    configure_logging(log_level="DEBUG")
+
+    root = logging.getLogger()
+
+    assert len(root.handlers) == 1
+    assert isinstance(root.handlers[0], logging.StreamHandler)
+    assert root.level == logging.DEBUG
+
+
+def test_configure_logging_suppresses_noisy_third_party_loggers(
+    restore_logging_state,
+):
+    """Test that the noisy third party loggers are being quiet!"""
+    configure_logging(log_level="INFO")
+
+    for name in [
+        "aioboto3",
+        "aiobotocore",
+        "aiohttp",
+        "asyncio",
+        "boto3",
+        "botocore",
+        "fsspec",
+        "graphviz",
+        "hamilton",
+        "s3fs",
+        "s3transfer",
+        "urllib3",
+    ]:
+        assert logging.getLogger(name).level == logging.WARNING

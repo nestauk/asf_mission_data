@@ -127,7 +127,7 @@ def persist(uri: str, content: bytes | str | dict[str, Any]) -> None:
     with fs.open(path, mode) as f:
         f.write(serialised_content)
 
-    logger.info("Saved: %s", uri)
+    logger.debug("Saved: %s", uri)
 
 
 def delete_prefix(uri_prefix: str) -> None:
@@ -146,18 +146,18 @@ def delete_prefix(uri_prefix: str) -> None:
     fs, path = fsspec.core.url_to_fs(uri_prefix)
 
     if not fs.exists(path):
-        logger.warning("Prefix does not exist: %s", uri_prefix)
+        logger.debug("Prefix does not exist: %s", uri_prefix)
         return
 
     targets = fs.glob(path + "*")
 
     if not targets:
-        logger.warning("No files found under prefix: %s", uri_prefix)
+        logger.debug("No files found under prefix: %s", uri_prefix)
         return
 
     fs.rm(path, recursive=True)
 
-    logger.info(
+    logger.debug(
         "Deleted %d item(s) under prefix: %s",
         len(targets),
         uri_prefix,
@@ -203,6 +203,8 @@ def ingest_to_bronze(
     delete_prefix(f"{base_path}/latest/metadata/")
     persist(latest_file, file)
     persist(latest_metadata, metadata)
+
+    logger.info("Ingested '%s' to %s (%s)", filename, layer_prefix, date_stamp)
 
 
 def save_dag(
@@ -273,7 +275,7 @@ def locate_latest(
     if not files:
         raise FileNotFoundError(f"No files found under prefix: {uri_prefix}")
 
-    logger.info("Found %d item(s) under prefix: %s", len(files), uri_prefix)
+    logger.debug("Found %d item(s) under prefix: %s", len(files), uri_prefix)
 
     return cast(str, fs.unstrip_protocol(files[0]))
 
@@ -290,11 +292,10 @@ def read_excel_sheet(excel_uri: str, sheet_name: str) -> pd.DataFrame:
     """
     try:
         df = pd.read_excel(excel_uri, sheet_name, engine="calamine")
-        logger.info(f"Successfully loaded '{sheet_name}' from {excel_uri} as a dataframe.")
+        logger.info("Successfully loaded '%s' from %s as a dataframe.", sheet_name, excel_uri)
         return df
     except Exception as e:
-        logger.error(f"Failed to load tab '{sheet_name}' from Excel file '{excel_uri}' as dataframe: {e}")
-        raise
+        raise RuntimeError(f"Could not load '{sheet_name}' from {excel_uri}") from e
 
 
 def read_json(json_uri: str) -> Any:
@@ -306,21 +307,15 @@ def read_json(json_uri: str) -> Any:
     Returns:
         Any: Parsed JSON content.
     """
-
     try:
         with fsspec.open(json_uri, mode="r") as f:
             data = json.load(f)
-
-        logger.info("Successfully loaded JSON from %s", json_uri)
+        logger.debug("Successfully loaded JSON from %s", json_uri)
         return data
-
-    except FileNotFoundError:
-        logger.error("JSON file not found: %s", json_uri)
-        raise
-
-    except Exception:
-        logger.exception("Unexpected error while reading JSON: %s", json_uri)
-        raise
+    except FileNotFoundError as e:
+        raise FileNotFoundError(f"JSON file not found: {json_uri}") from e
+    except Exception as e:
+        raise RuntimeError(f"Unexpected error while reading JSON: {json_uri}") from e
 
 
 def persist_df_parquet(uri: str, df: pd.DataFrame) -> None:
@@ -339,7 +334,7 @@ def persist_df_parquet(uri: str, df: pd.DataFrame) -> None:
     with fs.open(path, "wb") as f:
         df.to_parquet(f, engine="pyarrow", index=False)
 
-    logger.info("Saved parquet: %s", uri)
+    logger.debug("Saved parquet: %s", uri)
 
 
 def ingest_to_silver(
@@ -375,6 +370,8 @@ def ingest_to_silver(
     delete_prefix(f"{base_path}/latest/{df_name}")
     persist_df_parquet(latest_file, df)
 
+    logger.info("Ingested '%s' to %s (%s)", df_name, layer_prefix, date_stamp)
+
 
 def read_parquet(parquet_uri: str) -> pd.DataFrame:
     """Read a Parquet file from a given URI into a pandas DataFrame.
@@ -382,20 +379,18 @@ def read_parquet(parquet_uri: str) -> pd.DataFrame:
     Args:
         parquet_uri (str): URI or path to the Parquet file.
 
-    Raises:
-        e: Any exception encountered while opening or reading the Parquet file
-            is logged and re-raised.
-
     Returns:
         pd.DataFrame: DataFrame containing the data read from the Parquet file.
+
+    Raises:
+        RuntimeError: If the parquet file cannot be read.
     """
     try:
         with fsspec.open(parquet_uri, mode="rb") as f:
             df = pd.read_parquet(f)
         return df
     except Exception as e:
-        logger.error(f"Failed to read parquet file {parquet_uri}: {e}")
-        raise e
+        raise RuntimeError(f"Could not read parquet file: {parquet_uri}") from e
 
 
 def ingest_to_gold(
@@ -430,3 +425,5 @@ def ingest_to_gold(
 
     delete_prefix(f"{base_path}/latest/{df_name}")
     persist_df_parquet(latest_file, df)
+
+    logger.info("Ingested '%s' to %s (%s)", df_name, layer_prefix, date_stamp)

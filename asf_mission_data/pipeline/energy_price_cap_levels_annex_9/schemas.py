@@ -73,7 +73,7 @@ GOLD_PRICE_RATIOS_SCHEMA = pa.DataFrameSchema(
         "28AD Charge Restriction Period start": Column(pd.Timestamp),
         "28AD Charge Restriction Period end": Column(pd.Timestamp),
         "Variable": Column(str, Check.isin(["Electricity to gas price ratio"])),
-        "value": Column(float),
+        "value": Column(float, nullable=True),
         "metadata": Column(object),
         "change_from_previous_period": Column(float, nullable=True),
         "pct_change_from_previous_period": Column(float, nullable=True),

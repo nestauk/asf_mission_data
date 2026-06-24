@@ -6,12 +6,11 @@ Example downloads the UK government bank holidays JSON as a smoke test
 for internet access and S3 writes.
 """
 
+import logging
 import urllib.request
 from typing import cast
 
-from asf_mission_data.logging_utils import setup_logging
-
-logger = setup_logging(__name__)
+logger = logging.getLogger(__name__)
 
 SOURCE_URL = "https://www.gov.uk/bank-holidays.json"
 

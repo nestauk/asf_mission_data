@@ -1,51 +1,57 @@
-"""Shared logging helpers for pipeline modules."""
+"""Shared logging configuration. Call configure_logging once from the entry point
+(the first Python file that runs when you launch a pipeline.)"""
 
 import logging
 import sys
-from pathlib import Path
+import warnings
 
 DEFAULT_LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s - %(message)s"
 
 
-def setup_logging(
-    logger_name: str,
-    log_filename: str | None = None,
-    log_format: str = DEFAULT_LOG_FORMAT,
+def configure_logging(
     log_level: str = "INFO",
-) -> logging.Logger:
-    """Create a configured logger for local runs and ECS tasks.
+    log_format: str = DEFAULT_LOG_FORMAT,
+) -> None:
+    """Set up logging for the entire application.
 
-    Logs go to stdout by default so container platforms can collect them.
-    An optional file handler can be added for local debugging.
-    """
+    Call this once at startup (in run.py). Every module
+    that does logging.getLogger(__name__) will automatically
+    have its messages handled by the root logger configured in
+    this code."""
 
-    logger = logging.getLogger(logger_name)
-
+    # Suppress a known Pandera dependency warning from typeguard<3.
+    # Keeping this narrow so other Pandera warnings remain
+    warnings.filterwarnings(
+        "ignore",
+        message=r"Using typeguard < 3\..*",
+    )
+    root = logging.getLogger()
     level = getattr(logging, log_level.upper(), None)
     if not isinstance(level, int):
         raise ValueError(f"Invalid log level: {log_level}")
 
-    logger.setLevel(level)
-    # Stop messages bubbling up to the root logger and appearing twice.
-    logger.propagate = False
-
-    if logger.handlers:
-        # Clear direct handlers so repeated setup calls stay idempotent.
-        logger.handlers.clear()
-
+    root.setLevel(level)
+    root.handlers.clear()
     formatter = logging.Formatter(log_format)
 
-    # Stdout is the main log destination for ECS/Fargate tasks.
-    stream_handler = logging.StreamHandler(sys.stdout)
-    stream_handler.setFormatter(formatter)
-    logger.addHandler(stream_handler)
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(formatter)
+    root.addHandler(handler)
 
-    if log_filename:
-        # Append rather than overwrite so local debug logs are not lost on rerun.
-        file_handler = logging.FileHandler(Path(log_filename), mode="a")
-        file_handler.setFormatter(formatter)
-        # File log is always at DEBUG level, to capture all details for local debugging.
-        file_handler.setLevel(logging.DEBUG)
-        logger.addHandler(file_handler)
+    # Shut up the noisy third-party libraries
+    # Running the pipelines produced a lot of debug
+    # output from third-party libraries, which made it too hard
+    # to get the important info from the logs.
 
-    return logger
+    logging.getLogger("aioboto3").setLevel(logging.WARNING)
+    logging.getLogger("aiobotocore").setLevel(logging.WARNING)
+    logging.getLogger("aiohttp").setLevel(logging.WARNING)
+    logging.getLogger("asyncio").setLevel(logging.WARNING)
+    logging.getLogger("boto3").setLevel(logging.WARNING)
+    logging.getLogger("botocore").setLevel(logging.WARNING)
+    logging.getLogger("fsspec").setLevel(logging.WARNING)
+    logging.getLogger("graphviz").setLevel(logging.WARNING)
+    logging.getLogger("hamilton").setLevel(logging.WARNING)
+    logging.getLogger("s3fs").setLevel(logging.WARNING)
+    logging.getLogger("s3transfer").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)

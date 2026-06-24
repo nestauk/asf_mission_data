@@ -4,18 +4,18 @@ The example pipeline transforms raw bank holidays JSON
 into a DataFrame, validates it, and persists as parquet
 """
 
+import logging
 from typing import Any, cast
 
 import pandas as pd
 from hamilton.function_modifiers import check_output
 
 from asf_mission_data import storage
-from asf_mission_data.logging_utils import setup_logging
 from asf_mission_data.pipeline.example.schemas import (
     SILVER_BANK_HOLIDAYS_SCHEMA,
 )
 
-logger = setup_logging(__name__)
+logger = logging.getLogger(__name__)
 
 
 def bronze_bank_holidays_uri(dataset_prefix: str) -> str:

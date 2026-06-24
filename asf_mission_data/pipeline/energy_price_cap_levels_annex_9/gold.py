@@ -2,6 +2,7 @@
 
 import logging
 
+import numpy as np
 import pandas as pd
 from hamilton.function_modifiers import (
     check_output,
@@ -9,14 +10,20 @@ from hamilton.function_modifiers import (
 )
 
 from asf_mission_data import storage, utils
-from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import BENCHMARK_CONSUMPTION, COMPONENT_CATEGORY_MAP
+from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import (
+    BENCHMARK_CONSUMPTION,
+    COMPONENT_CATEGORY_MAP,
+    VAT,
+)
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.schemas import (
     GOLD_1C_CONSUMPTION_ADJUSTED_LEVELS_WITH_VAT_SCHEMA,
     GOLD_ANNUAL_BILL_FIXED_AND_VARIABLE_COMPONENT_CONTRIBUTIONS_SCHEMA,
     GOLD_PRICE_RATIOS_SCHEMA,
     GOLD_TARIFF_COMPONENT_RATES_SCHEMA,
 )
-from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.validators import TariffComponentsTotalValidator
+from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.validators import (
+    TariffComponentsTotalValidator,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +45,10 @@ def silver_df(silver_energy_price_cap_annex_9_dataset: str) -> pd.DataFrame:
 def latest_price_cap_period(silver_df: pd.DataFrame) -> str:
     """Latest price cap period from the silver DataFrame metadata."""
     metadata_dict = silver_df["metadata"].iloc[0]
-    return metadata_dict.get("price_cap_period")
+    period = metadata_dict.get("price_cap_period")
+    if not period:
+        raise KeyError("'price_cap_period' missing from silver metadata.")
+    return period
 
 
 # -------------------------------------------------------------
@@ -49,10 +59,17 @@ def latest_price_cap_period(silver_df: pd.DataFrame) -> str:
 @check_output_custom(
     TariffComponentsTotalValidator(
         value_col="value",
-        group_cols=["Consumption", "Fuel", "Payment method", "28AD Charge Restriction Period start"],
+        group_cols=[
+            "Consumption",
+            "Fuel",
+            "Payment method",
+            "28AD Charge Restriction Period start",
+        ],
     )
 )
-def consumption_adjusted_levels_with_vat_df(silver_df: pd.DataFrame) -> pd.DataFrame:
+def consumption_adjusted_levels_with_vat_df(
+    silver_df: pd.DataFrame,
+) -> pd.DataFrame:
     """Add VAT as a tariff component and uprate the total values to include VAT.
 
     This function derives VAT-inclusive tariff values from the silver dataset, and
@@ -70,12 +87,14 @@ def consumption_adjusted_levels_with_vat_df(silver_df: pd.DataFrame) -> pd.DataF
         VAT as a separate component, and updated `Total_GB average` values
         that include VAT.
     """
-    vat = 0.05
 
     # Add VAT as individual tariff component
+    if not silver_df["Tariff component"].eq("Total_GB average").any():
+        raise ValueError("Expected tariff component 'Total_GB average' not found in silver_df.")
+
     vat_rows = silver_df[silver_df["Tariff component"] == "Total_GB average"].copy()
     vat_rows["Tariff component"] = "VAT"
-    vat_rows["value"] *= vat
+    vat_rows["value"] *= VAT
 
     # Uprate Total_GB average to include VAT
     uprated_silver_df = silver_df.copy()
@@ -83,7 +102,7 @@ def consumption_adjusted_levels_with_vat_df(silver_df: pd.DataFrame) -> pd.DataF
     uprated_silver_df.loc[
         (uprated_silver_df["Tariff component"] == "Total_GB average"),
         "value",
-    ] *= 1 + vat
+    ] *= 1 + VAT
 
     # Remove now redundant "Total inc VAT" rows that were present only in the Dual fuel table
     uprated_silver_df = uprated_silver_df[uprated_silver_df["Tariff component"] != "Total inc VAT"]
@@ -91,9 +110,13 @@ def consumption_adjusted_levels_with_vat_df(silver_df: pd.DataFrame) -> pd.DataF
     return pd.concat([uprated_silver_df, vat_rows], ignore_index=True)
 
 
-@check_output(schema=GOLD_1C_CONSUMPTION_ADJUSTED_LEVELS_WITH_VAT_SCHEMA, importance="fail")
+@check_output(
+    schema=GOLD_1C_CONSUMPTION_ADJUSTED_LEVELS_WITH_VAT_SCHEMA,
+    importance="fail",
+)
 def gold_1c_consumption_adjusted_levels_with_vat_df(
-    consumption_adjusted_levels_with_vat_df: pd.DataFrame, silver_df: pd.DataFrame
+    consumption_adjusted_levels_with_vat_df: pd.DataFrame,
+    silver_df: pd.DataFrame,
 ) -> pd.DataFrame:
     """Create the gold-layer dataset for consumption-adjusted tariff levels including VAT.
 
@@ -125,12 +148,17 @@ def gold_1c_consumption_adjusted_levels_with_vat_df(
     df["pct_change_from_previous_period"] = (
         df.groupby(["Tariff component", "Fuel", "Payment method", "Consumption"])["value"].pct_change().mul(100).round(2)
     )
-
+    logger.info(
+        "Produced gold table '1c_consumption_adjusted_levels_with_vat': rows=%d",
+        len(df),
+    )
     return df
 
 
 def gold_1c_consumption_adjusted_levels_with_vat_parquet(
-    gold_1c_consumption_adjusted_levels_with_vat_df: pd.DataFrame, dataset_prefix: str, latest_price_cap_period: str
+    gold_1c_consumption_adjusted_levels_with_vat_df: pd.DataFrame,
+    dataset_prefix: str,
+    latest_price_cap_period: str,
 ) -> None:
     """Persist the gold-layer consumption-adjusted tariff levels with VAT as a parquet file."""
     storage.ingest_to_gold(
@@ -149,10 +177,17 @@ def gold_1c_consumption_adjusted_levels_with_vat_parquet(
 @check_output_custom(
     TariffComponentsTotalValidator(
         value_col="value",
-        group_cols=["Fuel", "Payment method", "28AD Charge Restriction Period start", "Type"],
+        group_cols=[
+            "Fuel",
+            "Payment method",
+            "28AD Charge Restriction Period start",
+            "Type",
+        ],
     )
 )
-def tariff_component_rates_df(consumption_adjusted_levels_with_vat_df: pd.DataFrame) -> pd.DataFrame:
+def tariff_component_rates_df(
+    consumption_adjusted_levels_with_vat_df: pd.DataFrame,
+) -> pd.DataFrame:
     """Calculate standing charges and unit rates for tariff components.
 
     The input dataset contains VAT-adjusted annual tariff component values for
@@ -175,6 +210,13 @@ def tariff_component_rates_df(consumption_adjusted_levels_with_vat_df: pd.DataFr
         unit prices by fuel, payment method, tariff component, and price cap
         period, with columns ``Type``, ``Unit``, and ``value``.
     """
+
+    expected_fuels = set(BENCHMARK_CONSUMPTION.keys())
+    found_fuels = set(consumption_adjusted_levels_with_vat_df["Fuel"].unique())
+    missing_fuels = expected_fuels - found_fuels
+    if missing_fuels:
+        raise ValueError(f"Expected fuel(s) not found in data: {missing_fuels}. Found fuels: {found_fuels}.")
+
     index_cols = [
         "Payment method",
         "Fuel",
@@ -189,9 +231,6 @@ def tariff_component_rates_df(consumption_adjusted_levels_with_vat_df: pd.DataFr
     for fuel, benchmark in BENCHMARK_CONSUMPTION.items():
         fuel_df = consumption_adjusted_levels_with_vat_df.loc[consumption_adjusted_levels_with_vat_df["Fuel"] == fuel]
 
-        if fuel_df.empty:
-            continue
-
         pivoted = (
             fuel_df.pivot_table(
                 index=index_cols,
@@ -201,6 +240,11 @@ def tariff_component_rates_df(consumption_adjusted_levels_with_vat_df: pd.DataFr
             .rename_axis(None, axis=1)
             .reset_index()
         )
+
+        expected_consumption_cols = {"Nil consumption", "Typical consumption"}
+        missing_consumption_cols = expected_consumption_cols - set(pivoted.columns)
+        if missing_consumption_cols:
+            raise ValueError(f"Expected consumption column(s) missing after pivot for fuel '{fuel}': {missing_consumption_cols}.")
 
         melted = (
             pivoted.assign(
@@ -262,11 +306,15 @@ def gold_tariff_component_rates_df(
     df["pct_change_from_previous_period"] = (
         df.groupby(["Tariff component", "Fuel", "Payment method", "Type"])["value"].pct_change().mul(100).round(2)
     )
-
+    logger.info("Produced gold table 'tariff_component_rates': rows=%d", len(df))
     return df
 
 
-def gold_tariff_component_rates_parquet(gold_tariff_component_rates_df: pd.DataFrame, dataset_prefix: str, latest_price_cap_period: str) -> None:
+def gold_tariff_component_rates_parquet(
+    gold_tariff_component_rates_df: pd.DataFrame,
+    dataset_prefix: str,
+    latest_price_cap_period: str,
+) -> None:
     """Persist the gold-layer standing charge and unit rates for each component
     as a parquet file."""
     storage.ingest_to_gold(
@@ -282,7 +330,9 @@ def gold_tariff_component_rates_parquet(gold_tariff_component_rates_df: pd.DataF
 # -------------------------------------------------------------
 
 
-def total_unit_rates_df(tariff_component_rates_df: pd.DataFrame) -> pd.DataFrame:
+def total_unit_rates_df(
+    tariff_component_rates_df: pd.DataFrame,
+) -> pd.DataFrame:
     """Extract total unit prices for gas and electricity and reshape them for comparison.
 
     This function filters the tariff component rates to retain only the
@@ -300,6 +350,12 @@ def total_unit_rates_df(tariff_component_rates_df: pd.DataFrame) -> pd.DataFrame
         electricity in separate columns for each payment method and
         price cap period.
     """
+    expected_fuels = {"Gas", "Electricity: Single-Rate Metering Arrangement"}
+    found_fuels = set(tariff_component_rates_df["Fuel"].unique())
+    missing = expected_fuels - found_fuels
+    if missing:
+        raise ValueError(f"Missing fuels in tariff_component_rates_df: {missing}. Found fuels: {found_fuels}.")
+
     totals_df = tariff_component_rates_df[
         (tariff_component_rates_df["Tariff component"] == "Total_GB average")
         & (tariff_component_rates_df["Fuel"].isin(["Gas", "Electricity: Single-Rate Metering Arrangement"]))
@@ -349,7 +405,10 @@ def gold_price_ratios_df(total_unit_rates_df: pd.DataFrame, silver_df: pd.DataFr
     """
     pivoted = total_unit_rates_df.copy()
 
-    pivoted["value"] = pivoted["Electricity (single rate) unit price"] / pivoted["Gas unit price"]
+    # Gas unit price may be zero in edge cases
+    # Replace the resulting inf with NaN so downstream charts skip the value
+    # rather than rendering a misleading spike
+    pivoted["value"] = (pivoted["Electricity (single rate) unit price"] / pivoted["Gas unit price"]).replace([np.inf, -np.inf], np.nan)
 
     id_cols = [
         "Payment method",
@@ -368,10 +427,28 @@ def gold_price_ratios_df(total_unit_rates_df: pd.DataFrame, silver_df: pd.DataFr
     df["change_from_previous_period"] = df.groupby(["Payment method"])["value"].diff()
     df["pct_change_from_previous_period"] = df.groupby(["Payment method"])["value"].pct_change().mul(100).round(2)
 
+    null_ratio_count = int(df["value"].isna().sum())
+
+    logger.info(
+        "Produced gold table 'price_ratios': rows=%d, null_ratios=%d",
+        len(df),
+        null_ratio_count,
+    )
+
+    if null_ratio_count:
+        logger.warning(
+            "Gold table 'price_ratios' contains %d null electricity-to-gas ratios.",
+            null_ratio_count,
+        )
+
     return df.reset_index(drop=True)
 
 
-def gold_price_ratios_parquet(gold_price_ratios_df: pd.DataFrame, dataset_prefix: str, latest_price_cap_period: str) -> None:
+def gold_price_ratios_parquet(
+    gold_price_ratios_df: pd.DataFrame,
+    dataset_prefix: str,
+    latest_price_cap_period: str,
+) -> None:
     """Persist the gold-layer dataset for electricity-to-gas price ratios as a parquet file."""
     storage.ingest_to_gold(
         dataset_prefix=dataset_prefix,
@@ -389,10 +466,17 @@ def gold_price_ratios_parquet(gold_price_ratios_df: pd.DataFrame, dataset_prefix
 @check_output_custom(
     TariffComponentsTotalValidator(
         value_col="value",
-        group_cols=["Fuel", "Payment method", "28AD Charge Restriction Period start", "Type"],
+        group_cols=[
+            "Fuel",
+            "Payment method",
+            "28AD Charge Restriction Period start",
+            "Type",
+        ],
     )
 )
-def annual_bill_fixed_and_variable_contributions_df(consumption_adjusted_levels_with_vat_df: pd.DataFrame) -> pd.DataFrame:
+def annual_bill_fixed_and_variable_contributions_df(
+    consumption_adjusted_levels_with_vat_df: pd.DataFrame,
+) -> pd.DataFrame:
     """Derive annual fixed and variable bill contributions for tariff components.
 
     The input dataset contains VAT-adjusted annual tariff component values for
@@ -415,6 +499,12 @@ def annual_bill_fixed_and_variable_contributions_df(consumption_adjusted_levels_
         ``Unit`` ("GBP/year"), and ``value``.
     """
 
+    expected_fuels = set(BENCHMARK_CONSUMPTION.keys())
+    found_fuels = set(consumption_adjusted_levels_with_vat_df["Fuel"].unique())
+    missing_fuels = expected_fuels - found_fuels
+    if missing_fuels:
+        raise ValueError(f"Expected fuel(s) not found in data: {missing_fuels}. Found fuels: {found_fuels}.")
+
     index_cols = [
         "Payment method",
         "Fuel",
@@ -429,9 +519,6 @@ def annual_bill_fixed_and_variable_contributions_df(consumption_adjusted_levels_
     for fuel in BENCHMARK_CONSUMPTION.keys():
         fuel_df = consumption_adjusted_levels_with_vat_df.loc[consumption_adjusted_levels_with_vat_df["Fuel"] == fuel]
 
-        if fuel_df.empty:
-            continue
-
         pivoted = (
             fuel_df.pivot_table(
                 index=index_cols,
@@ -441,6 +528,11 @@ def annual_bill_fixed_and_variable_contributions_df(consumption_adjusted_levels_
             .rename_axis(None, axis=1)
             .reset_index()
         )
+
+        expected_consumption_cols = {"Nil consumption", "Typical consumption"}
+        missing_consumption_cols = expected_consumption_cols - set(pivoted.columns)
+        if missing_consumption_cols:
+            raise ValueError(f"Expected consumption column(s) missing after pivot for fuel '{fuel}': {missing_consumption_cols}.")
 
         melted = (
             pivoted.assign(
@@ -471,9 +563,13 @@ def annual_bill_fixed_and_variable_contributions_df(consumption_adjusted_levels_
     return pd.concat(dfs, ignore_index=True)
 
 
-@check_output(schema=GOLD_ANNUAL_BILL_FIXED_AND_VARIABLE_COMPONENT_CONTRIBUTIONS_SCHEMA, importance="fail")
+@check_output(
+    schema=GOLD_ANNUAL_BILL_FIXED_AND_VARIABLE_COMPONENT_CONTRIBUTIONS_SCHEMA,
+    importance="fail",
+)
 def gold_annual_bill_fixed_and_variable_component_contributions_df(
-    annual_bill_fixed_and_variable_contributions_df: pd.DataFrame, silver_df: pd.DataFrame
+    annual_bill_fixed_and_variable_contributions_df: pd.DataFrame,
+    silver_df: pd.DataFrame,
 ) -> pd.DataFrame:
     """Create the gold dataset for annual bill fixed and variable cost contributions.
 
@@ -506,12 +602,17 @@ def gold_annual_bill_fixed_and_variable_component_contributions_df(
     df["pct_change_from_previous_period"] = (
         df.groupby(["Tariff component", "Fuel", "Payment method", "Type"])["value"].pct_change().mul(100).round(2)
     )
-
+    logger.info(
+        "Produced gold table 'annual_bill_fixed_and_variable_component_contributions': rows=%d",
+        len(df),
+    )
     return df
 
 
 def gold_annual_bill_fixed_and_variable_component_contributions_parquet(
-    gold_annual_bill_fixed_and_variable_component_contributions_df: pd.DataFrame, dataset_prefix: str, latest_price_cap_period: str
+    gold_annual_bill_fixed_and_variable_component_contributions_df: pd.DataFrame,
+    dataset_prefix: str,
+    latest_price_cap_period: str,
 ) -> None:
     """Persist the gold-layer dataset for gas and electricity unit prices, electricity-to-gas price ratios
     as a parquet file."""

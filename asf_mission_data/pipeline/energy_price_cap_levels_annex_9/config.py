@@ -62,6 +62,8 @@ BENCHMARK_CONSUMPTION = {  # MWh per year
     "Electricity: Multi-Register Metering Arrangement": 3.9,
 }
 
+VAT = 0.05
+
 COMPONENT_CATEGORY_MAP = {
     "DF": "Wholesale",  # Direct fuel
     "CM": "Wholesale",  # Capacity market
