@@ -69,7 +69,7 @@ def latest_price_cap_period(
             logger.info("Detected latest price cap period: %s", period)
             return period
 
-    raise ValueError("Could not find latest price cap period on page.")
+    raise ValueError(f"Could not find a heading matching expected pattern '{PRICE_CAP_PERIOD_STRING_PATTERN}' on page.")
 
 
 def latest_file_content(latest_file_url: str) -> bytes:
