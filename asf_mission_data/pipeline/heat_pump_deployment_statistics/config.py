@@ -1,5 +1,5 @@
 """
-Static configuration values for extracting Heat Pump Deployment statistics data from DESNZ.
+Configuration constants for the Heat Pump Deployment Statistics pipeline.
 """
 
 DATASET_PREFIX = "heat_pump_deployment_statistics"

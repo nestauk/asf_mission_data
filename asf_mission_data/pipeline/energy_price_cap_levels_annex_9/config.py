@@ -1,5 +1,5 @@
 """
-Static configuration values for extracting Energy Price Cap Levels Annex 9 data from Ofgem.
+Configuration constants for the Energy Price Cap Levels Annex 9 pipeline.
 """
 
 DATASET_PREFIX = "energy_price_cap_levels/annex_9"

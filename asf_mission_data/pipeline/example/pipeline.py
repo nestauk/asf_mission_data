@@ -11,12 +11,11 @@ from datetime import datetime, timezone
 from hamilton import driver
 
 from asf_mission_data.pipeline.example import silver
-from asf_mission_data.pipeline.example.bronze import SOURCE_URL, fetch_raw_data
+from asf_mission_data.pipeline.example.bronze import fetch_raw_data
+from asf_mission_data.pipeline.example.config import DATASET_PREFIX, SOURCE_URL
 from asf_mission_data.storage import ingest_to_bronze
 
 logger = logging.getLogger(__name__)
-
-DATASET_PREFIX = "example"
 
 
 def run_bronze_pipeline() -> None:
