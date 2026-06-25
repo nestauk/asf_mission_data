@@ -169,3 +169,60 @@ image_tag=dev-latest
 ### I do not know the pipeline name
 
 Check `pipelines.yaml`. The `pipeline` input must match one of its keys.
+
+
+MOVED OUT FROM README.md
+
+### Running pipelines locally
+
+```bash
+# Set local mode (otherwise the default is the dev S3 bucket)
+export DATA_MODE=LOCAL
+export DATA_ROOT=/tmp/pipeline-dev
+
+# Run the example pipeline
+uv run python -m asf_mission_data.run example --stage all
+
+# Check output
+ls /tmp/pipeline-dev/
+```
+
+Or use the `.env.example` file:
+
+```bash
+cp .env.example .env
+source .env
+uv run python -m asf_mission_data.run example --stage all
+```
+
+For the full local-vs-AWS workflow, see [docs/running-pipelines.md](docs/running-pipelines.md).
+
+## Deployment
+
+For the supported ways to build images and run pipelines in AWS, see [docs/running-pipelines.md](docs/running-pipelines.md).
+
+## Docker
+
+Build the image with a canonical tag:
+
+```bash
+docker build -t asf-mission-data .
+```
+
+Run a pipeline in a local filesystem-backed mode:
+
+```bash
+mkdir -p /tmp/asf-mission-data
+
+docker run --rm \
+  -e DATA_MODE=LOCAL \
+  -e DATA_ROOT=/tmp/asf-mission-data \
+  -v /tmp/asf-mission-data:/tmp/asf-mission-data \
+  asf-mission-data \
+  example --stage all
+```
+
+Notes:
+
+- The image tag above is `asf-mission-data`, not `asf_mission_data`.
+- If you omit `DATA_MODE`/`DATA_ROOT`, the container defaults to the dev S3 location and expects the corresponding AWS runtime configuration.

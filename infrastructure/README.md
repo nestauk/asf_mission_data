@@ -220,3 +220,34 @@ If resources were modified outside CDK:
 aws cloudformation detect-stack-drift --stack-name asf-core-dev
 aws cloudformation describe-stack-resource-drifts --stack-name asf-core-dev
 ```
+
+MOVED OUT FROM README
+
+## Infrastructure
+
+Infrastructure is managed with [AWS CDK](https://aws.amazon.com/cdk/) (Python).
+
+### Core resources (deployed)
+
+| Resource | Dev | Prod |
+|----------|-----|------|
+| S3 bucket | `asf-mission-data-dev` | `asf-mission-data-prod` |
+| ECR repository | `asf-mission-data` | `asf-mission-data` |
+| GitHub Actions IAM role | `asf-github-actions-dev` | `asf-github-actions-prod` |
+
+### Deploying infrastructure
+
+```bash
+# Install CDK dependencies
+uv sync --extra infrastructure
+npm install -g aws-cdk
+
+# Deploy to dev
+cd infrastructure
+cdk deploy --context env=dev
+
+# Preview changes
+cdk diff --context env=dev
+```
+
+See [infrastructure/README.md](infrastructure/README.md) for full documentation.

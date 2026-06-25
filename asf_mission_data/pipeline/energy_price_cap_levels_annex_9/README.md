@@ -4,7 +4,7 @@ Ingests Ofgem's published "Final levelised cap rates model (Annex 9)" Excel work
 
 **Source:** Ofgem  
 **Update cadence:** Quarterly (two months before start of each price cap period)  
-**Pipeline run name:**: `energy_price_cap_levels_annex_9`  
+**Pipeline run name:** `energy_price_cap_levels_annex_9`  
 **Storage prefix:** `energy_price_cap_levels/annex_9`
 
 
