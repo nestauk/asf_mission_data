@@ -1,84 +1,88 @@
 # Running Pipelines
 
-This repo supports a few different ways of running a pipeline, but most people only need two:
+This repo supports two main ways to run a pipeline: locally while developing, and via GitHub Actions for AWS runs.
 
-- run locally while developing
-- use the GitHub Actions UI for ad hoc runs in AWS
-
-Everything else should be treated as advanced or debugging-only.
-
-## What To Use When
+## Quick reference
 
 | I want to... | Use this | Notes |
 |---|---|---|
 | develop or debug pipeline code | local run | fastest feedback, no AWS dependency |
-| test my branch in AWS | build an image, then use `Run pipeline` | standard cloud test path |
-| run against the default dev image | `Run pipeline` with `image_tag=dev-latest` | easiest ad hoc cloud run |
-| launch from a terminal with more control | `scripts/trigger_pipeline.py` | advanced/debug path |
+| run a pipeline using code from a branch | `Build and push Docker Image to ECR` (from your branch), then `Test pipeline in dev` | standard dev test path |
+| run a pipeline using code already on `dev` | `Test pipeline in dev` with `image_tag=dev-latest` | quickest dev run; no image build needed |
+| run a pipeline in prod | **TODO** `Run pipeline in prod` workflow from `prod` branch | easiest manual pipeline trigger in prod; refreshing data |
+| launch a pipeline in AWS from the terminal instead of GitHub UI | `scripts/trigger_pipeline.py` | advanced/debug path |
 
-## Standard Workflow
 
-For most cloud runs, the process is:
+## Running locally in pipeline development
 
-1. build a Docker image for the code you want to test
-2. copy the image tag from the build workflow summary
-3. run the `Run pipeline` workflow with that tag
-
-That is the main team workflow. If you are unsure which path to use, use this one.
-
-## Local Development
-
-Use local mode when developing or debugging pipeline logic.
+Use local mode when developing or debugging pipeline logic. Run these commands in your terminal:
 
 ```bash
+# Set local mode (otherwise the default is the dev S3 bucket)
 export DATA_MODE=LOCAL
 export DATA_ROOT=/tmp/pipeline-dev
 
+# Run all stages
 uv run python -m asf_mission_data.run example --stage all
 ```
 
 This avoids Docker, ECS, and ECR entirely.
 
-## Build An Image For A Branch
+### Stages
 
-Use the `Build and push Docker Image to ECR` workflow when you want to test branch code in AWS.
+Pipelines have two or three stages: **bronze** (raw fetch), **silver** (clean and transform), and optionally **gold** (aggregated outputs). Use `--stage` to control which runs:
 
-### How tags are created
+- `--stage all` — run every available stage in order
+- `--stage bronze` — run only the fetch stage
+- `--stage silver` — run only the transform stage
+- `--stage gold` — run only the aggregation stage (if the pipeline has one)
 
-The workflow tags images from the branch name using:
+When developing, you can run a single stage to avoid re-fetching data you already have.
 
-```text
-{branch-name-with-/-replaced-by--}-latest
+## Advanced: Running locally in pipeline development with Docker
+
+Use this when you want to test your code inside the container — the same environment it runs in on AWS — without pushing to ECR or triggering a cloud run. This is useful for catching issues specific to the container, such as missing dependencies in the Dockerfile.
+
+First, build the image:
+
+```bash
+docker build -t asf-mission-data .
 ```
 
-Examples:
+Then run a pipeline against your local filesystem:
 
-- `dev` -> `dev-latest`
-- `feat/image-check` -> `feat-image-check-latest`
-- `alex/test-run` -> `alex-test-run-latest`
+```bash
+mkdir -p /tmp/asf-mission-data
 
-The exact image URI is written to the workflow summary at the end of the build.
+docker run --rm \
+  -e DATA_MODE=LOCAL \
+  -e DATA_ROOT=/tmp/asf-mission-data \
+  -v /tmp/asf-mission-data:/tmp/asf-mission-data \
+  asf-mission-data \
+  example --stage all
+```
 
-### Which branches use which tags
+The `-v` flag mounts your local directory into the container so output is written to `/tmp/asf-mission-data` on your machine.
 
-- pushes to `dev` automatically build `dev-latest`
-- manual workflow runs build a tag for the branch selected in GitHub
+Note: the image tag is `asf-mission-data` (hyphen), not `asf_mission_data` (underscore). If you omit `DATA_MODE` and `DATA_ROOT`, the container will try to use the dev S3 bucket instead.
 
-Do not guess the tag if you can avoid it. Copy it from the build workflow summary.
+## Running in AWS during pipeline development
 
-## Run A Pipeline In AWS
+Workflows are triggered from the [Actions tab](https://github.com/nestauk/asf_mission_data/actions) in the GitHub repo.
 
-Use the `Run pipeline` workflow in GitHub Actions for standard ad hoc runs.
+Use the `Test pipeline in dev` workflow for dev runs. It takes three inputs:
 
-Inputs:
+- `pipeline` - must match a key in `pipelines.yaml`
+- `stage` - one of `all`, `bronze`, `silver`, `gold`
+- `image_tag` - ECR tag of the container image to run
 
-- `pipeline`: must match a key in `pipelines.yaml`
-- `stage`: one of `all`, `bronze`, `silver`, `gold`
-- `image_tag`: the ECR tag to use
+Running a pipeline with this workflow will populate data in the `asf-mission-data-dev` S3 bucket.
 
-Examples:
+The workflow summary will show you the resolved task definition, the container image used, and an error if the image tag does not exist in ECR. A missing tag fails before any task is started.
 
-- use the default dev image:
+### Which image tag to use?
+
+**If you want to test pipeline code that is already on the `dev` branch**, select the `dev` branch from the dropdown under `Use workflow from` and use the `image_tag=dev-latest`. This is built and pushed automatically from the `dev` branch whenever new code is merged into it.
 
 ```text
 pipeline=example
@@ -86,7 +90,13 @@ stage=all
 image_tag=dev-latest
 ```
 
-- test a branch image:
+**If you want to test pipeline code from a specific branch**, you first need to build an image. Run the `Build and push Docker Image to ECR` workflow and select your branch from the dropdown under `Use workflow from`. The tag is derived from the branch name, e.g.:
+- `feat/image-check` → `feat-image-check-latest`
+- `alex/test-run` →  `alex-test-run-latest`
+
+Do not guess the tag if you can avoid it. The exact tag is written to the workflow summary, you can copy it from there to use it in `Test pipeline in dev`.
+
+When running the `Test pipeline in dev`, select the `dev` branch from the dropdown under `Use workflow from`, but the `image_tag` should correspond to the branch image.
 
 ```text
 pipeline=example
@@ -94,17 +104,18 @@ stage=all
 image_tag=feat-image-check-latest
 ```
 
-### What the workflow shows you
+## Running in AWS for a pipeline in production
 
-The workflow now surfaces the important launch details in the Actions UI:
+This writes to the production `asf-mission-data-prod` S3 bucket. Only run this when you intend to refresh production data.
 
-- the resolved task definition
-- the container image actually used
-- a highlighted error if the requested image tag does not exist in ECR
+Use the `Run pipeline in prod` workflow in GitHub Actions, **TODO** selecting the `prod` branch from the dropdown under `Use workflow from`. It takes two inputs:
 
-That means a missing tag fails before registering a new task definition or starting a task.
+- `pipeline` - must match a key in `pipelines.yaml`
+- `stage` - one of `all`, `bronze`, `silver`, `gold`
 
-## Advanced: Trigger From The Terminal
+Data written to the prod bucket is picked up automatically. Infrastructure scans the bucket hourly and runs `CREATE OR REPLACE` on the corresponding DuckLake tables. Those tables are connected to Superset via DuckDB, and changes should appear there after 10 minutes.
+
+## Advanced: Running in AWS from the terminal
 
 You can also launch the same flow directly:
 
@@ -127,22 +138,28 @@ This script:
 
 Use this when you need CLI control. For most users, the GitHub UI is simpler.
 
-## What Is Supported vs Advanced
-
-Supported for most users:
-
-- local runs via `python -m asf_mission_data.run`
-- cloud runs via `Build and push Docker Image to ECR`
-- cloud runs via `Run pipeline`
-
-Advanced/debug only:
-
-- direct use of `scripts/trigger_pipeline.py`
-- trying to run GitHub Actions workflows locally
-
-This repo does not treat "run the GitHub workflow locally" as a standard path. For normal use, prefer the GitHub UI or the Python trigger script.
-
 ## Troubleshooting
+
+### I want to check the Docker image was built and pushed to ECR successfully
+
+After the `Build and push Docker Image to ECR` workflow completes, check the `asf-mission-data` [repository in ECR](https://eu-west-2.console.aws.amazon.com/ecr/repositories/private/195787726158/asf-mission-data/_/details?region=eu-west-2) via the AWS console and confirm your tag is listed (either an updated `dev-latest` or a tag corresponding to your feature branch).
+
+---
+
+### I want to watch the logs during a pipeline run in AWS
+
+You can watch the log streams in CloudWatch for each run in the following ECS log groups:
+
+- Dev runs: `asf-mission-data-dev` [ECS log group](https://eu-west-2.console.aws.amazon.com/cloudwatch/home?region=eu-west-2#logsV2:log-groups/log-group/$252Fecs$252Fasf-mission-data-dev).
+- Prod runs: `asf-mission-data-prod` [ECS log group](https://eu-west-2.console.aws.amazon.com/cloudwatch/home?region=eu-west-2#logsV2:log-groups/log-group/$252Fecs$252Fasf-mission-data-prod).
+
+---
+
+### I want to check the pipeline output landed in S3
+
+After the run completes, check the S3 bucket (`asf-mission-data-dev` for dev runs, or `asf-mission-data-prod` for prod runs) directly in the AWS console to confirm the expected files are present.
+
+---
 
 ### The image tag does not exist
 
@@ -156,73 +173,14 @@ What to do:
 
 1. run `Build and push Docker Image to ECR`
 2. copy the tag from the workflow summary
-3. rerun `Run pipeline` with that exact tag
+3. rerun `Test pipeline in dev` with that exact tag
 
-### I just want the latest shared dev image
-
-Use:
-
-```text
-image_tag=dev-latest
-```
+---
 
 ### I do not know the pipeline name
 
-Check `pipelines.yaml`. The `pipeline` input must match one of its keys.
+Check `pipelines.yaml`. The `pipeline` input must match one of its keys. Pipeline names are the top-level keys, e.g., `example` or `energy_price_cap_levels_annex_9`.
 
+---
 
-MOVED OUT FROM README.md
-
-### Running pipelines locally
-
-```bash
-# Set local mode (otherwise the default is the dev S3 bucket)
-export DATA_MODE=LOCAL
-export DATA_ROOT=/tmp/pipeline-dev
-
-# Run the example pipeline
-uv run python -m asf_mission_data.run example --stage all
-
-# Check output
-ls /tmp/pipeline-dev/
-```
-
-Or use the `.env.example` file:
-
-```bash
-cp .env.example .env
-source .env
-uv run python -m asf_mission_data.run example --stage all
-```
-
-For the full local-vs-AWS workflow, see [docs/running-pipelines.md](docs/running-pipelines.md).
-
-## Deployment
-
-For the supported ways to build images and run pipelines in AWS, see [docs/running-pipelines.md](docs/running-pipelines.md).
-
-## Docker
-
-Build the image with a canonical tag:
-
-```bash
-docker build -t asf-mission-data .
-```
-
-Run a pipeline in a local filesystem-backed mode:
-
-```bash
-mkdir -p /tmp/asf-mission-data
-
-docker run --rm \
-  -e DATA_MODE=LOCAL \
-  -e DATA_ROOT=/tmp/asf-mission-data \
-  -v /tmp/asf-mission-data:/tmp/asf-mission-data \
-  asf-mission-data \
-  example --stage all
-```
-
-Notes:
-
-- The image tag above is `asf-mission-data`, not `asf_mission_data`.
-- If you omit `DATA_MODE`/`DATA_ROOT`, the container defaults to the dev S3 location and expects the corresponding AWS runtime configuration.
+*Last updated: 29 June 2026 by Elysia Lucas*

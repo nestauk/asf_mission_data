@@ -83,3 +83,36 @@ source .venv/bin/activate
 # Or run commands directly without activating, e.g.
 uv run python -m asf_mission_data.run example --stage all
 ```
+
+## Infrastructure
+
+Infrastructure is managed with [AWS CDK](https://aws.amazon.com/cdk/) (Python).
+
+### Core resources (deployed)
+
+| Resource | Dev | Prod |
+|----------|-----|------|
+| S3 bucket | `asf-mission-data-dev` | `asf-mission-data-prod` |
+| ECR repository | `asf-mission-data` | `asf-mission-data` |
+| GitHub Actions IAM role | `asf-github-actions-dev` | `asf-github-actions-prod` |
+
+### Deploying infrastructure
+
+```bash
+# Install CDK dependencies
+uv sync --extra infrastructure
+npm install -g aws-cdk
+
+# Deploy to dev
+cd infrastructure
+cdk deploy --context env=dev
+
+# Preview changes
+cdk diff --context env=dev
+```
+
+See [infrastructure/README.md](infrastructure/README.md) for full documentation.
+
+---
+
+*Last updated: 29 June 2026 by Elysia Lucas*
