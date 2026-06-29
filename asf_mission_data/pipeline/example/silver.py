@@ -10,7 +10,7 @@ from typing import Any, cast
 import pandas as pd
 from hamilton.function_modifiers import check_output
 
-from asf_mission_data import storage
+from asf_mission_data import storage, utils
 from asf_mission_data.pipeline.example.schemas import (
     SILVER_BANK_HOLIDAYS_SCHEMA,
 )
@@ -41,19 +41,11 @@ def bronze_bank_holidays_metadata(dataset_prefix: str) -> dict[str, Any]:
     return cast(dict[str, Any], storage.read_json(uri))
 
 
-def silver_bank_holidays_date_stamp(
+def latest_publication_date(
     bronze_bank_holidays_metadata: dict[str, Any],
 ) -> str:
-    """Build a stable historical silver partition from the bronze ingest timestamp."""
-    ingested_at = bronze_bank_holidays_metadata.get("ingested_at")
-    if not ingested_at:
-        raise ValueError("Expected 'ingested_at' in bronze metadata for silver historical storage.")
-
-    ingested_at_dt = pd.to_datetime(ingested_at, utc=True)
-    if pd.isna(ingested_at_dt):
-        raise ValueError(f"Could not parse bronze ingest timestamp: {ingested_at}")
-
-    return f"ingested={ingested_at_dt.strftime('%Y-%m-%dT%H-%M-%SZ')}"
+    """Return publication date of latest bronze file from metadata."""
+    return bronze_bank_holidays_metadata.get("publication_date")
 
 
 def flattened_bank_holidays_df(
@@ -113,14 +105,14 @@ def validated_bank_holidays_df(
 def silver_bank_holidays_parquet(
     validated_bank_holidays_df: pd.DataFrame,
     dataset_prefix: str,
-    silver_bank_holidays_date_stamp: str,
+    latest_publication_date: str,
 ) -> pd.DataFrame:
     """Persist the validated DataFrame to the silver layer as parquet."""
     storage.ingest_to_silver(
         dataset_prefix=dataset_prefix,
         df=validated_bank_holidays_df,
         df_name="bank_holidays",
-        date_stamp=silver_bank_holidays_date_stamp,
+        date_stamp=f"published={utils.normalise_date_string(latest_publication_date)}",
     )
     logger.info("Silver stage persisted %d rows", len(validated_bank_holidays_df))
     return validated_bank_holidays_df
