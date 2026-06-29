@@ -1,4 +1,4 @@
-# Running Pipelines
+# Running pipelines
 
 This repo supports two main ways to run a pipeline: locally while developing, and via GitHub Actions for AWS runs.
 

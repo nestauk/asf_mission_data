@@ -1,7 +1,27 @@
 
-MOVED OUT FROM README
+# Adding a new pipeline
 
-## Testing pipelines
+This guide walks through adding a new data pipeline to this repo. A pipeline has two or three stages - **bronze** (fetch and store raw data), **silver** (clean and transform), and optionally **gold** (aggregated outputs) - and runs as an ECS task on AWS.
+
+The `pipeline/example/` directory is the canonical reference implementation. Read it alongside this guide.
+
+This guide covers building and registering the pipeline. For running it locally or in AWS once it's built, see [`running-pipelines.md`](docs/running-pipelines.md).
+
+## 1. Scaffold the pipeline
+
+## 2. Register the pipeline
+
+## 3. Implement bronze
+
+## 4. Implement silver
+
+## 5. Implement gold (optional)
+
+## 6. Create pipeline entrypoint
+
+## 7. Write tests (recommended)
+
+Tests are not required to merge a new pipeline, but they do guard against code regressions as the codebase evolves.
 
 For new bronze/silver pipelines in this repo, the recommended baseline is:
 
@@ -41,3 +61,7 @@ Run the full suite with:
 ```bash
 uv run pytest
 ```
+
+## 8. Verify locally
+
+## 9. Checklist before opening a PR
