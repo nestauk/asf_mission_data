@@ -1,43 +1,20 @@
 import json
 from pathlib import Path
-from types import TracebackType
 from typing import Any
 
 import pytest
 
 from asf_mission_data.pipeline.example import bronze, pipeline
+from asf_mission_data.pipeline.example.config import SOURCE_URL
 
 
-class _FakeResponse:
-    def __init__(self, data: bytes) -> None:
-        self._data = data
-
-    def read(self) -> bytes:
-        return self._data
-
-    def __enter__(self) -> "_FakeResponse":
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        tb: TracebackType | None,
-    ) -> None:
-        return None
-
-
-def test_fetch_raw_data_downloads_bytes(
+def test_latest_file_content_fetches_bytes(
     monkeypatch: pytest.MonkeyPatch,
     sample_bank_holidays_bytes: bytes,
 ) -> None:
-    def fake_urlopen(url: str) -> _FakeResponse:
-        assert url == bronze.SOURCE_URL
-        return _FakeResponse(sample_bank_holidays_bytes)
+    monkeypatch.setattr(bronze.utils, "fetch_raw_content", lambda url: sample_bank_holidays_bytes)
 
-    monkeypatch.setattr(bronze.urllib.request, "urlopen", fake_urlopen)
-
-    assert bronze.fetch_raw_data() == sample_bank_holidays_bytes
+    assert bronze.latest_file_content(SOURCE_URL) == sample_bank_holidays_bytes
 
 
 def test_run_bronze_pipeline_persists_latest_file_and_metadata(
