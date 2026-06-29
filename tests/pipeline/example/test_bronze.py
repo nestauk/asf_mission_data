@@ -17,6 +17,7 @@ def test_latest_file_content_fetches_bytes(
     assert bronze.latest_file_content(SOURCE_URL) == sample_bank_holidays_bytes
 
 
+# TODO change based on Hamilton node changes
 def test_run_bronze_pipeline_persists_latest_file_and_metadata(
     monkeypatch: pytest.MonkeyPatch,
     local_data_root: str,

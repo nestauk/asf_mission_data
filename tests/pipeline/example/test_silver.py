@@ -41,6 +41,7 @@ def test_parsed_bank_holidays_df_parses_dates_and_adds_year(
     assert list(df["year"]) == [2025, 2025, 2025]
 
 
+# TODO change based on Hamilton node changes
 def test_silver_bank_holidays_date_stamp_uses_bronze_ingest_time() -> None:
     date_stamp = silver.silver_bank_holidays_date_stamp(
         {
@@ -92,6 +93,7 @@ def test_hamilton_validation_fails_closed_for_invalid_silver_data() -> None:
         )
 
 
+# TODO change based on Hamilton node changes
 def test_run_silver_pipeline_reads_latest_bronze_and_writes_parquet(
     local_data_root: str,
     sample_bank_holidays_json: dict[str, Any],
