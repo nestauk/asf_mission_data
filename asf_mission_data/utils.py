@@ -23,7 +23,7 @@ def fetch_raw_content(url: str, timeout: int = 30) -> bytes:
     """Fetch raw binary content from a given URL.
 
     Makes an HTTP GET request to the given URL and returns the response as raw bytes.
-    Raises `SourceFetchError` if the request fails or returns a non-success status code..
+    Raises `SourceFetchError` if the request fails or returns a non-success status code.
 
     Args:
         url (str): URL to fetch content from.
@@ -35,16 +35,12 @@ def fetch_raw_content(url: str, timeout: int = 30) -> bytes:
     Returns:
         bytes: Raw response content.
     """
-
-    logger.info("Fetching content from %s", url)
-
     try:
         response = requests.get(url, timeout=timeout)
         response.raise_for_status()
         logger.info("Fetched %d bytes from %s", len(response.content), url)
         return response.content
     except requests.exceptions.RequestException as e:
-        logger.error("Failed to fetch %s: %s", url, e)
         raise SourceFetchError(f"Failed to fetch {url}") from e
 
 
@@ -160,3 +156,61 @@ def convert_energy_price_cap_charge_restriction_period_string_to_interval(
             period_str,
         )
         raise ValueError("Charge restriction period string '%s' does not match expected regex pattern.")
+
+
+def normalise_charge_restriction_period(period: str, month_map: dict[str, str]) -> str:
+    """Normalise charge restriction period string to consistent abbreviated format."""
+    for full, abbrev in month_map.items():
+        period = period.replace(full, abbrev)
+    return period
+
+
+def normalise_date_string(date_str: str) -> str:
+    """Convert a date string from 'DD Month YYYY' format to 'YYYY-MM-DD'.
+
+    Args:
+        date_str (str): Date string in the format 'DD Month YYYY'.
+
+    Returns:
+        str: Date string in ISO format 'YYYY-MM-DD'.
+    """
+    date = datetime.strptime(date_str.strip(), "%d %B %Y")
+    return date.strftime("%Y-%m-%d")
+
+
+def fetch_govuk_content(page_url: str) -> dict:
+    """Fetch content metadata from the GOV.UK Content API for a given page URL.
+
+    Args:
+        page_url (str): Full GOV.UK page URL.
+
+    Returns:
+        dict: JSON response from the GOV.UK Content API.
+
+    Raises:
+        requests.HTTPError: If the API request fails.
+    """
+    path = page_url.replace("https://www.gov.uk", "")
+    response = requests.get(f"https://www.gov.uk/api/content{path}")
+    response.raise_for_status()
+    return response.json()
+
+
+def safe_get_govuk_response(data: dict, *keys: str | int) -> any:
+    """Safely extract a nested value from a GOV.UK API response dict.
+
+    Raises:
+        KeyError: If a key or index is missing, with a hint that the API structure may have changed.
+    """
+    for key in keys:
+        try:
+            data = data[key]
+        except (KeyError, IndexError, TypeError) as e:
+            raise KeyError(f"Unexpected API response structure. Missing key: '{key}'. Has the GOV.UK Content API schema changed?") from e
+    return data
+
+
+def standardise_column_names(df: pd.DataFrame) -> pd.DataFrame:
+    """Standardise column names to lowercase with underscores."""
+    df.columns = df.columns.str.strip().str.lower().str.replace(r"\s+", "_", regex=True).str.replace(r"[^\w]", "_", regex=True)
+    return df

@@ -8,6 +8,23 @@ ETL pipelines for the ASF Policy Dashboard.
 
 - Python 3.12+ (uv will install this automatically if needed)
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) for dependency management
+- Graphviz, for pipelines that render Hamilton DAG images. The Python `graphviz` package is installed by `uv sync`, but the system `dot` executable must also be available on your `PATH`.
+
+  macOS:
+
+  ```bash
+  brew install graphviz
+  dot -V
+  ```
+
+  Windows:
+
+  ```powershell
+  winget install Graphviz.Graphviz
+  dot -V
+  ```
+
+  If `dot -V` is not found on Windows, restart your terminal and check that the Graphviz `bin` directory is on `PATH`. Chocolatey users can install it with `choco install graphviz`.
 
 ### Installation
 

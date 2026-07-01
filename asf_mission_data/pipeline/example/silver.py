@@ -4,23 +4,23 @@ The example pipeline transforms raw bank holidays JSON
 into a DataFrame, validates it, and persists as parquet
 """
 
+import logging
 from typing import Any, cast
 
 import pandas as pd
 from hamilton.function_modifiers import check_output
 
 from asf_mission_data import storage
-from asf_mission_data.logging_utils import setup_logging
 from asf_mission_data.pipeline.example.schemas import (
     SILVER_BANK_HOLIDAYS_SCHEMA,
 )
 
-logger = setup_logging(__name__)
+logger = logging.getLogger(__name__)
 
 
 def bronze_bank_holidays_uri(dataset_prefix: str) -> str:
     """Locate the latest bronze bank holidays JSON file."""
-    uri = storage.locate_latest_bronze(dataset_prefix, "file")
+    uri = storage.locate_latest(dataset_prefix, "file", "bronze")
     if uri is None:
         raise FileNotFoundError(f"No latest bronze file found for dataset prefix '{dataset_prefix}'.")
     logger.info("Located bronze file: %s", uri)
@@ -34,7 +34,7 @@ def bronze_bank_holidays_json(bronze_bank_holidays_uri: str) -> dict[str, Any]:
 
 def bronze_bank_holidays_metadata(dataset_prefix: str) -> dict[str, Any]:
     """Load metadata for the latest bronze bank holidays ingest."""
-    uri = storage.locate_latest_bronze(dataset_prefix, "metadata")
+    uri = storage.locate_latest(dataset_prefix, "metadata", "bronze")
     if uri is None:
         raise FileNotFoundError(f"No latest bronze metadata found for dataset prefix '{dataset_prefix}'.")
     logger.info("Located bronze metadata: %s", uri)

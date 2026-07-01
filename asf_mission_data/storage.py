@@ -127,7 +127,7 @@ def persist(uri: str, content: bytes | str | dict[str, Any]) -> None:
     with fs.open(path, mode) as f:
         f.write(serialised_content)
 
-    logger.info("Saved: %s", uri)
+    logger.debug("Saved: %s", uri)
 
 
 def delete_prefix(uri_prefix: str) -> None:
@@ -146,18 +146,18 @@ def delete_prefix(uri_prefix: str) -> None:
     fs, path = fsspec.core.url_to_fs(uri_prefix)
 
     if not fs.exists(path):
-        logger.warning("Prefix does not exist: %s", uri_prefix)
+        logger.debug("Prefix does not exist: %s", uri_prefix)
         return
 
     targets = fs.glob(path + "*")
 
     if not targets:
-        logger.warning("No files found under prefix: %s", uri_prefix)
+        logger.debug("No files found under prefix: %s", uri_prefix)
         return
 
     fs.rm(path, recursive=True)
 
-    logger.info(
+    logger.debug(
         "Deleted %d item(s) under prefix: %s",
         len(targets),
         uri_prefix,
@@ -172,25 +172,11 @@ def ingest_to_bronze(
     metadata: dict[str, Any],
     layer_prefix: str = "bronze",
 ) -> None:
-    """Persists raw dataset files and associated metadata to the bronze storage layer.
+    """Persist raw dataset files and associated metadata to the bronze storage layer.
 
     Behaviour:
-        1. Persist the incoming dataset and metadata to the historical archive.
-        2. Remove any existing files in the "latest" directory.
-        3. Persist the dataset and metadata as the current "latest" version.
-
-    Storage paths are constructed dynamically using the configured DATA_ROOT
-    and can be local or remote storage via URI.
-
-    Storage structure:
-        <data_root>/data/<layer_prefix>/<dataset_prefix>/
-            historical/
-                <date_stamp>/
-                    file/<filename>
-                    metadata/<filename>.metadata.json
-            latest/
-                file/<filename>
-                metadata/<filename>.metadata.json
+        - Stores a historical version with timestamp.
+        - Updates the 'latest' version by replacing previous files.
 
     Args:
         dataset_prefix (str): Dataset identifier used to namespace storage.
@@ -198,7 +184,7 @@ def ingest_to_bronze(
         filename (str): Name of the dataset file.
         date_stamp (str): Canonical timestamp or partition identifier for historical archiving.
         metadata (dict): Provenance metadata associated with dataset.
-        layer_prefix (str): Storage namespace representing the data layer (e.g. "bronze").
+        layer_prefix (str): Storage namespace representing the data layer.
             Defaults to "bronze".
     """
 
@@ -217,6 +203,8 @@ def ingest_to_bronze(
     delete_prefix(f"{base_path}/latest/metadata/")
     persist(latest_file, file)
     persist(latest_metadata, metadata)
+
+    logger.info("Ingested '%s' to %s (%s)", filename, layer_prefix, date_stamp)
 
 
 def save_dag(
@@ -255,53 +243,39 @@ def save_dag(
     persist(historical_file, dag_image)
 
 
-def locate_latest_bronze(
+def locate_latest(
     dataset_prefix: str,
-    file_or_metadata: str = "file",
-    layer_prefix: str = "bronze",
-) -> str | None:
-    """Locate the latest bronze dataset file or metadata for a given pipeline.
+    sub_prefix: str,
+    layer_prefix: str,
+) -> str:
+    """Locate the latest file under a given storage prefix.
 
     Args:
         dataset_prefix (str): Dataset identifier used to namespace storage.
-        file_or_metadata (str, optional): Either 'file' or 'metadata'.
-            Defaults to "file".
-        layer_prefix (str): Storage namespace representing the data layer (e.g. "bronze").
-            Defaults to "bronze".
+        sub_prefix (str): Sub-prefix to locate (e.g. 'file', 'metadata', or a table name).
+        layer_prefix (str): Storage namespace representing the data layer (e.g. 'bronze', 'silver').
 
     Raises:
-        ValueError: If `file_or_metadata` is not 'file' or 'metadata'.
+        FileNotFoundError: If the prefix or files do not exist.
 
     Returns:
-        str | None: URI of the latest bronze file or metadata, or None if not found.
+        str: URI of the latest file.
     """
-
-    if file_or_metadata not in ["file", "metadata"]:
-        raise ValueError(f"Invalid file type {file_or_metadata} to be located, must be 'file' or 'metadata'.")
-
     _, data_root = _initialise_environment()
 
-    uri_prefix = f"{data_root}/data/{layer_prefix}/{dataset_prefix}/latest/{file_or_metadata}"
+    uri_prefix = f"{data_root}/data/{layer_prefix}/{dataset_prefix}/latest/{sub_prefix}"
 
     fs, path = fsspec.core.url_to_fs(uri_prefix)
 
     if not fs.exists(path):
-        logger.info("Prefix does not exist: %s", uri_prefix)
-        return None
+        raise FileNotFoundError(f"Prefix does not exist: {uri_prefix}")
 
-    files = fs.glob(path + "/*")
-
-    files = [f for f in files if fs.isfile(f)]
+    files = [f for f in fs.glob(path + "/*") if fs.isfile(f)]
 
     if not files:
-        logger.info("No files found under prefix: %s", uri_prefix)
-        return None
+        raise FileNotFoundError(f"No files found under prefix: {uri_prefix}")
 
-    logger.info(
-        "Found %d item(s) under prefix: %s",
-        len(files),
-        uri_prefix,
-    )
+    logger.debug("Found %d item(s) under prefix: %s", len(files), uri_prefix)
 
     return cast(str, fs.unstrip_protocol(files[0]))
 
@@ -318,11 +292,10 @@ def read_excel_sheet(excel_uri: str, sheet_name: str) -> pd.DataFrame:
     """
     try:
         df = pd.read_excel(excel_uri, sheet_name, engine="calamine")
-        logger.info(f"Successfully loaded '{sheet_name}' from {excel_uri} as a dataframe.")
+        logger.info("Successfully loaded '%s' from %s as a dataframe.", sheet_name, excel_uri)
         return df
     except Exception as e:
-        logger.error(f"Failed to load tab '{sheet_name}' from Excel file '{excel_uri}' as dataframe: {e}")
-        raise
+        raise RuntimeError(f"Could not load '{sheet_name}' from {excel_uri}") from e
 
 
 def read_json(json_uri: str) -> Any:
@@ -334,21 +307,15 @@ def read_json(json_uri: str) -> Any:
     Returns:
         Any: Parsed JSON content.
     """
-
     try:
         with fsspec.open(json_uri, mode="r") as f:
             data = json.load(f)
-
-        logger.info("Successfully loaded JSON from %s", json_uri)
+        logger.debug("Successfully loaded JSON from %s", json_uri)
         return data
-
-    except FileNotFoundError:
-        logger.error("JSON file not found: %s", json_uri)
-        raise
-
-    except Exception:
-        logger.exception("Unexpected error while reading JSON: %s", json_uri)
-        raise
+    except FileNotFoundError as e:
+        raise FileNotFoundError(f"JSON file not found: {json_uri}") from e
+    except Exception as e:
+        raise RuntimeError(f"Unexpected error while reading JSON: {json_uri}") from e
 
 
 def persist_df_parquet(uri: str, df: pd.DataFrame) -> None:
@@ -367,7 +334,7 @@ def persist_df_parquet(uri: str, df: pd.DataFrame) -> None:
     with fs.open(path, "wb") as f:
         df.to_parquet(f, engine="pyarrow", index=False)
 
-    logger.info("Saved parquet: %s", uri)
+    logger.debug("Saved parquet: %s", uri)
 
 
 def ingest_to_silver(
@@ -377,7 +344,7 @@ def ingest_to_silver(
     date_stamp: str,
     layer_prefix: str = "silver",
 ) -> None:
-    """Save a DataFrame to the silver storage layer.
+    """Persist a DataFrame to the silver storage layer.
 
     Behaviour:
         - Stores a historical version with timestamp.
@@ -388,7 +355,7 @@ def ingest_to_silver(
         df (pd.DataFrame): DataFrame to persist.
         df_name (str): Name of the DataFrame (used in storage paths).
         date_stamp (str): Canonical timestamp for historical storage.
-        layer_prefix (str): Storage namespace representing the data layer (e.g. "silver").
+        layer_prefix (str): Storage namespace representing the data layer.
             Defaults to "silver".
     """
 
@@ -402,3 +369,61 @@ def ingest_to_silver(
 
     delete_prefix(f"{base_path}/latest/{df_name}")
     persist_df_parquet(latest_file, df)
+
+    logger.info("Ingested '%s' to %s (%s)", df_name, layer_prefix, date_stamp)
+
+
+def read_parquet(parquet_uri: str) -> pd.DataFrame:
+    """Read a Parquet file from a given URI into a pandas DataFrame.
+
+    Args:
+        parquet_uri (str): URI or path to the Parquet file.
+
+    Returns:
+        pd.DataFrame: DataFrame containing the data read from the Parquet file.
+
+    Raises:
+        RuntimeError: If the parquet file cannot be read.
+    """
+    try:
+        with fsspec.open(parquet_uri, mode="rb") as f:
+            df = pd.read_parquet(f)
+        return df
+    except Exception as e:
+        raise RuntimeError(f"Could not read parquet file: {parquet_uri}") from e
+
+
+def ingest_to_gold(
+    dataset_prefix: str,
+    df: pd.DataFrame,
+    df_name: str,
+    date_stamp: str,
+    layer_prefix: str = "gold",
+) -> None:
+    """Persist a DataFrame to the gold storage layer.
+
+    Behaviour:
+        - Stores a historical version with timestamp.
+        - Updates the 'latest' version by replacing previous files.
+
+    Args:
+        dataset_prefix (str): Dataset identifier used to namespace storage.
+        df (pd.DataFrame): DataFrame to persist.
+        df_name (str): Name of the DataFrame (used in storage paths).
+        date_stamp (str): Canonical timestamp for historical storage.
+        layer_prefix (str): Storage namespace representing the data layer.
+            Defaults to "gold".
+    """
+
+    _, data_root = _initialise_environment()
+
+    base_path = f"{data_root}/data/{layer_prefix}/{dataset_prefix}"
+    historical_file = f"{base_path}/historical/{date_stamp}/{df_name}/{df_name}.parquet"
+    latest_file = f"{base_path}/latest/{df_name}/{df_name}.parquet"
+
+    persist_df_parquet(historical_file, df)
+
+    delete_prefix(f"{base_path}/latest/{df_name}")
+    persist_df_parquet(latest_file, df)
+
+    logger.info("Ingested '%s' to %s (%s)", df_name, layer_prefix, date_stamp)
