@@ -6,7 +6,7 @@ Ingests the UK bank holidays dataset as a simple pipeline example.
 
 **Source:** <!-- Organisation or publisher e.g. GOVUK, Ofgem, DESNZ -->GOV.UK  
 **Update cadence:** <!-- How often new data is published e.g. quarterly, monthly --> Annually  
-**Pipeline run name:**: <!-- Name as registered in pipelines.yaml, also the folder name in the repo --> `example`  
+**Pipeline run name:** <!-- Name as registered in pipelines.yaml, also the folder name in the repo --> `example`  
 **Storage prefix:** <!-- Prefix in S3 as defined in config.DATASET_PREFIX --> `example`
 
 

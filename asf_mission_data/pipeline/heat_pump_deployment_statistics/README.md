@@ -43,7 +43,7 @@ Ingests data on the number of heat pumps installed in the UK, only includes thos
 
 ## Notes
 
-1. This dataset has 'Official statistics in development' meaning it is still undergoing methodological development and subject to change.
+1. This dataset has 'Official statistics in development' status meaning it is still undergoing methodological development and subject to change.
 2. The source Excel workbook contains a `Notes` sheet with numbered footnotes that are referenced inline in the data tables (e.g. `[note 1]`). The pipeline resolves these into a `notes` column in the silver tables. If the workbook structure changes, e.g., if the `Notes` sheet is renamed or the footnote format changes, this logic may break silently.
 
 ---
