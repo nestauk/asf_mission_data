@@ -7,13 +7,18 @@ for internet access and S3 writes.
 """
 
 import logging
-
-from asf_mission_data.pipeline.example.config import SOURCE_URL
-from asf_mission_data.utils import fetch_raw_content
+import urllib.request
+from typing import cast
 
 logger = logging.getLogger(__name__)
+
+SOURCE_URL = "https://www.gov.uk/bank-holidays.json"
 
 
 def fetch_raw_data() -> bytes:
     """Download bank holidays JSON from gov.uk."""
-    return fetch_raw_content(SOURCE_URL)
+    logger.info("Fetching data from %s", SOURCE_URL)
+    with urllib.request.urlopen(SOURCE_URL) as response:
+        data = cast(bytes, response.read())
+    logger.info("Downloaded %d bytes", len(data))
+    return data
