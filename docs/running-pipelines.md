@@ -9,7 +9,7 @@ This repo supports two main ways to run a pipeline: locally while developing, an
 | develop or debug pipeline code | local run | fastest feedback, no AWS dependency |
 | run a pipeline using code from a branch | `Build and push Docker Image to ECR` (from your branch), then `Test pipeline in dev` | standard dev test path |
 | run a pipeline using code already on `dev` | `Test pipeline in dev` with `image_tag=dev-latest` | quickest dev run; no image build needed |
-| run a pipeline in prod | **TODO** `Run pipeline in prod` workflow from `prod` branch | easiest manual pipeline trigger in prod; refreshing data |
+| run a pipeline in prod | `Run pipeline in prod` workflow from `prod` branch | easiest manual pipeline trigger in prod; refreshing data |
 | launch a pipeline in AWS from the terminal instead of GitHub UI | `scripts/trigger_pipeline.py` | advanced/debug path |
 
 
@@ -108,7 +108,7 @@ image_tag=feat-image-check-latest
 
 This writes to the production `asf-mission-data-prod` S3 bucket. Only run this when you intend to refresh production data.
 
-Use the `Run pipeline in prod` workflow in GitHub Actions, **TODO** selecting the `prod` branch from the dropdown under `Use workflow from`. It takes two inputs:
+Use the `Run pipeline in prod` workflow in GitHub Actions, selecting the `prod` branch from the dropdown under `Use workflow from`. It takes two inputs:
 
 - `pipeline` - must match a key in `pipelines.yaml`
 - `stage` - one of `all`, `bronze`, `silver`, `gold`
