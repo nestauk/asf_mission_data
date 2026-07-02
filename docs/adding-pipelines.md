@@ -248,7 +248,7 @@ def silver_<pipeline_name>_parquet(
     return validated_df
 ```
 
-See [heat_pump_deployment_statistics/silver.py](../asf_mission_data/pipeline/heat_pump_deployment_statistics/silver.py) for a worked example, including a pipeline with multiple output tables.
+See [heat_pump_deployment_statistics/silver.py](../asf_mission_data/pipeline/heat_pump_deployment_statistics/silver.py) for a worked example of a pipeline with multiple silver output tables.
 
 ## 5. Implement gold (optional)
 
@@ -266,7 +266,7 @@ The pattern is identical to silver, except gold reads from silver storage instea
 
 Schemas for gold tables go in the same `schemas.py` file as silver schemas.
 
-See [energy_price_cap_levels_annex_9/gold.py](../asf_mission_data/pipeline/energy_price_cap_levels_annex_9/gold.py) for a worked example with multiple output tables.
+See [energy_price_cap_levels_annex_9/gold.py](../asf_mission_data/pipeline/energy_price_cap_levels_annex_9/gold.py) for a worked example of a pipeline with multiple gold output tables.
 
 ## 6. Create pipeline entrypoint
 
@@ -362,8 +362,6 @@ def run(stage: str = "bronze", extra_args: list[str] | None = None) -> None:
 
 Add a matching `if stage in ("gold", "all"):` branch if your pipeline has a gold stage.
 
-See [heat_pump_deployment_statistics/pipeline.py](../asf_mission_data/pipeline/heat_pump_deployment_statistics/pipeline.py) for a complete worked example.
-
 ## 7. Write tests (recommended)
 
 Tests are not required to merge a new pipeline, but they guard against regressions as the codebase evolves. Different failures happen in different places, so tests should cover each layer separately:
@@ -441,16 +439,7 @@ A pipeline's `README.md` is the human-readable reference for what it produces: a
 
 Every pipeline directory needs one. Copy the template from [`docs/templates/pipelines/README.md`](../docs/templates/pipelines/README.md) into your pipeline directory and fill it in.
 
-The template covers:
-
-- **Header fields** - source, update cadence, the pipeline's registered name (must match `pipelines.yaml` and the directory name), and its S3 storage prefix (`config.DATASET_PREFIX`)
-- **One section per stage** (bronze/silver/gold) - for bronze, the source, fetch method, output format, and any validators; for silver and gold, one subsection per output table describing its input, output, and validators. Delete any stage or table subsection that doesn't apply to your pipeline
-- **Notes** - an optional section for lookup tables, constants, or field definitions a reader would want on hand. Delete it if there's nothing to add
-- **Last updated** - update this whenever the README changes
-
-This is separate from the `description` field in `pipelines.yaml` (step 2) that field drives tooling and should stay a single sentence; this README is for maintainers and can go into more depth.
-
-See [heat_pump_deployment_statistics/README.md](../asf_mission_data/pipeline/heat_pump_deployment_statistics/README.md) for a filled-in example.
+`<pipeline>/README.md`is separate from the information in `pipelines.yaml` (step 2) which drives tooling; this README is for maintainers and can go into more depth.
 
 ## 10. Open a PR
 

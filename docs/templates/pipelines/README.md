@@ -4,7 +4,7 @@
 
 **Source:** <!-- Organisation or publisher e.g. GOVUK, Ofgem, DESNZ -->  
 **Update cadence:**   <!-- How often new data is published e.g. quarterly, monthly -->  
-**Pipeline run name:**: <!-- Name as registered in pipelines.yaml, also the folder name in the repo -->  
+**Pipeline run name:** <!-- Name as registered in pipelines.yaml, also the folder name in the repo -->  
 **Storage prefix:** <!-- Prefix in S3 as defined in config.DATASET_PREFIX -->  
 
 
