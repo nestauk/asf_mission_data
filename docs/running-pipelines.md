@@ -113,6 +113,8 @@ Use the `Run pipeline in prod` workflow in GitHub Actions, selecting the `prod` 
 - `pipeline` - must match a key in `pipelines.yaml`
 - `stage` - one of `all`, `bronze`, `silver`, `gold`
 
+Triggering this workflow doesn't run it immediately. It targets the `prod` GitHub Environment, which requires approval from a designated reviewer before the job proceeds. You'll see it sitting in "Waiting" status in the Actions run until someone approves it.
+
 Data written to the prod bucket is picked up automatically. Infrastructure scans the bucket hourly and runs `CREATE OR REPLACE` on the corresponding DuckLake tables. Those tables are connected to Superset via DuckDB, and changes should appear there after 10 minutes.
 
 ## Advanced: Running in AWS from the terminal

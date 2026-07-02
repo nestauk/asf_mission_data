@@ -75,6 +75,7 @@ Main steps (with further detail under each section below):
 7. **Write tests (recommended)** - cover fetch, transform, and validation logic
 8. **Verify locally** - run all stages and check outputs
 9. **Write a pipeline README** - complete `templates/pipelines/README.md`
+10. **Open a PR** - land it on `dev`, then promote to `prod`
 
 ## 1. Scaffold the pipeline
 
@@ -104,11 +105,11 @@ Add an entry to [`pipelines.yaml`](../pipelines.yaml) at the root of the repo:
 pipelines:
   your_pipeline_name:
     owner: your_name
-    schedule: TBC
+    schedule: TBC # TODO
     description: One sentence describing what data this pipeline fetches
     source_url: https://example.gov.uk/the-source-page
     stages: [bronze, silver]
-    stack_name: tbc
+    stack_name: tbc # TODO
 ```
 
 The pipeline name must be a unique key and must match the directory name you created under `asf_mission_data/pipeline/`. It is also the value you pass to `--pipeline` when running the pipeline via GitHub Actions or the trigger script.
@@ -116,6 +117,8 @@ The pipeline name must be a unique key and must match the directory name you cre
 Include `gold` in `stages` if your pipeline has a gold stage.
 
 `pipelines.yaml` is config, not documentation. It's read directly by GitHub Actions and by the EventBridge schedule, so `schedule` and `stages` must be accurate for the pipeline to run correctly. `description` here should stay to one sentence, since it's surfaced in tooling rather than read as prose. Fuller documentation (what the pipeline does, quirks in the source, update frequency in human terms) belongs in the pipeline's own `README.md` (see step 9).
+
+<!-- TODO: once infrastructure is finalised on how `stack_name` and `schedule` are used, update these instructions -->
 
 ## 3. Implement bronze
 
@@ -448,6 +451,10 @@ The template covers:
 This is separate from the `description` field in `pipelines.yaml` (step 2) that field drives tooling and should stay a single sentence; this README is for maintainers and can go into more depth.
 
 See [heat_pump_deployment_statistics/README.md](../asf_mission_data/pipeline/heat_pump_deployment_statistics/README.md) for a filled-in example.
+
+## 10. Open a PR
+
+A new pipeline isn't done until it's running in prod. Follow the process in [CONTRIBUTING.md](../docs/CONTRIBUTING.md): a PR into `dev`, then a `dev` → `prod` promotion PR. Since this is the pipeline's first promotion, tick "New pipeline" in the prod PR template's checklist.
 
 ---
 

@@ -49,6 +49,11 @@ infrastructure/.env
 *.parquet
 /data/
 
+# Notebooks
+# Scratch notebooks aren't meant to be committed — see docs/DEVELOPMENT.md
+*.ipynb
+.ipynb_checkpoints/
+
 # Logs
 *.log
 

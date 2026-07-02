@@ -96,11 +96,11 @@ Infrastructure is managed with [AWS CDK](https://aws.amazon.com/cdk/) (Python).
 | ECR repository | `asf-mission-data` | `asf-mission-data` |
 | GitHub Actions IAM role | `asf-github-actions-dev` | `asf-github-actions-prod` |
 
-### Deploying infrastructure
+### TODO: Deploying infrastructure
 
 ```bash
 # Install CDK dependencies
-uv sync --extra infrastructure
+uv sync --group infrastructure
 npm install -g aws-cdk
 
 # Deploy to dev
@@ -111,7 +111,7 @@ cdk deploy --context env=dev
 cdk diff --context env=dev
 ```
 
-See [infrastructure/README.md](infrastructure/README.md) for full documentation.
+TODO: See [infrastructure/README.md](infrastructure/README.md) for full documentation.
 
 ---
 
