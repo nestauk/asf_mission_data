@@ -2,8 +2,6 @@
 #
 # This file is the source of truth for what pipelines exist.
 # Update this file when adding a new pipeline.
-#
-# The health check Lambda will read this to know what schedules to expect.
 
 pipelines:
   example:

@@ -15,7 +15,7 @@ on:
       - prod
 
 env:
-  AWS_REGION: eu-west-2
+  AWS_REGION: ${{ vars.AWS_REGION }}
   ECR_REPO: asf-mission-data
 
 jobs:
