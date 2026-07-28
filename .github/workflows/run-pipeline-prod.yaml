@@ -20,6 +20,7 @@ on:
 
 env:
   AWS_REGION: eu-west-2
+  SLACK_CHANNEL: asf-data-pipeline-sandbox
 
 jobs:
   trigger:
@@ -52,6 +53,9 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Trigger pipeline
+      # Green here means "launched", not "succeeded". The task's real
+      # outcome is reported to Slack by the notifier once it stops.
+      - name: Launch pipeline
         run: |
           uv run python scripts/trigger_pipeline.py ${{ inputs.pipeline }} --environment prod --stage ${{ inputs.stage }}
+          echo "🚀 Launched ${{ inputs.pipeline }} (prod) — result will appear in #${{ env.SLACK_CHANNEL }}" >> "$GITHUB_STEP_SUMMARY"

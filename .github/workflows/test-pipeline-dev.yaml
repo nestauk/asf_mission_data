@@ -56,6 +56,9 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Trigger pipeline
+      # Green here means "launched", not "succeeded". The task's real
+      # outcome is reported by the notifier once it stops.
+      - name: Launch pipeline
         run: |
           uv run python scripts/trigger_pipeline.py ${{ inputs.pipeline }} --environment dev --stage ${{ inputs.stage }} --image-tag ${{ inputs.image_tag }}
+          echo "🚀 Launched ${{ inputs.pipeline }} (dev) — the run outcome will appear in the ECS logs (dev runs do not alert Slack)" >> "$GITHUB_STEP_SUMMARY"
