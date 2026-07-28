@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 
 from hamilton import driver
 
+from asf_mission_data import observability
 from asf_mission_data.pipeline.example import silver
 from asf_mission_data.pipeline.example.bronze import SOURCE_URL, fetch_raw_data
 from asf_mission_data.storage import ingest_to_bronze
@@ -47,6 +48,7 @@ def build_silver_driver() -> driver.Driver:
                 "dataset_prefix": DATASET_PREFIX,
             }
         )
+        .with_adapters(*observability.driver_adapters())
         .build()
     )
     return dr

@@ -3,6 +3,7 @@ import importlib
 import logging
 import os
 
+from asf_mission_data import observability
 from asf_mission_data.logging_utils import configure_logging
 
 logger = logging.getLogger(__name__)
@@ -48,6 +49,7 @@ def main() -> int:
         return 1
 
     module.run(stage=args.stage)
+    observability.write_success_manifest(pipeline=args.pipeline, stage=args.stage)
     return 0
 
 

@@ -8,7 +8,7 @@ from importlib.metadata import version
 
 from hamilton import driver
 
-from asf_mission_data import storage, utils
+from asf_mission_data import observability, storage, utils
 from asf_mission_data.pipeline.heat_pump_deployment_statistics import (
     bronze,
     silver,
@@ -44,6 +44,7 @@ def build_bronze_driver() -> driver.Driver:
                 "bronze_ingest_timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
             }
         )
+        .with_adapters(*observability.driver_adapters())
         .build()
     )
     return dr
@@ -63,6 +64,11 @@ def run_bronze_pipeline() -> None:
         "latest_publication_date",
     ]
     results = dr.execute(node_targets)
+
+    observability.record(
+        publication_date=results["latest_publication_date"],
+        filename=results["latest_filename"],
+    )
 
     # generate dag image
     dag_png = dr.visualize_execution(
@@ -85,7 +91,13 @@ def build_silver_driver(sheet_name: str) -> driver.Driver:
     """Construct general Hamilton driver configured to execute a silver layer DAG for a specific table in
     the Heat Pump Deployment Statistics pipeline.
     """
-    dr = driver.Builder().with_modules(silver).with_config({"dataset_prefix": DATASET_PREFIX, "sheet_name": sheet_name}).build()
+    dr = (
+        driver.Builder()
+        .with_modules(silver)
+        .with_config({"dataset_prefix": DATASET_PREFIX, "sheet_name": sheet_name})
+        .with_adapters(*observability.driver_adapters())
+        .build()
+    )
     return dr
 
 
