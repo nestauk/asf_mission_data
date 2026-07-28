@@ -8,6 +8,7 @@ Usage:
 """
 
 import argparse
+import getpass
 import os
 import sys
 from dataclasses import dataclass
@@ -175,7 +176,35 @@ def resolve_task_definition(image_tag: str, infra: InfraConfig, environment: str
     )
 
 
-def run_task(pipeline: str, stage: str, capacity_provider: str, task_definition: str, infra: InfraConfig) -> None:
+def get_run_tags(pipeline: str, stage: str, image_tag: str) -> list[dict[str, str]]:
+    """Tags attached to the ECS task so the notifier can attribute the run.
+
+    Scheduled runs launch via EventBridge Scheduler without this script, so
+    they carry no tags — the notifier treats absence of `triggered_by` as
+    "scheduled run".
+    """
+    triggered_by = os.environ.get("GITHUB_ACTOR") or getpass.getuser()
+    tags = [
+        {"key": "pipeline", "value": pipeline},
+        {"key": "stage", "value": stage},
+        {"key": "image_tag", "value": image_tag},
+        {"key": "triggered_by", "value": triggered_by},
+    ]
+    github_run_id = os.environ.get("GITHUB_RUN_ID")
+    if github_run_id:
+        tags.append({"key": "github_run_id", "value": github_run_id})
+    return tags
+
+
+def get_started_by() -> str | None:
+    """startedBy completes the trace chain begun by the role-session name (≤36 chars)."""
+    github_run_id = os.environ.get("GITHUB_RUN_ID")
+    if github_run_id:
+        return f"gha-{github_run_id}"[:36]
+    return None
+
+
+def run_task(pipeline: str, stage: str, image_tag: str, capacity_provider: str, task_definition: str, infra: InfraConfig) -> None:
     params: dict[str, Any] = {
         "cluster": infra.cluster,
         "taskDefinition": task_definition,
@@ -201,7 +230,12 @@ def run_task(pipeline: str, stage: str, capacity_provider: str, task_definition:
                 }
             ]
         },
+        "tags": get_run_tags(pipeline, stage, image_tag),
     }
+
+    started_by = get_started_by()
+    if started_by:
+        params["startedBy"] = started_by
 
     client = boto3.client("ecs", region_name=AWS_REGION)
     try:
@@ -252,6 +286,7 @@ if __name__ == "__main__":
     run_task(
         args.pipeline,
         args.stage,
+        args.image_tag,
         args.capacity_provider,
         resolved.task_definition,
         infra,
