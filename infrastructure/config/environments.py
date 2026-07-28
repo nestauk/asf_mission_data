@@ -73,3 +73,8 @@ class EnvironmentConfig:
     def github_oidc_subject(self) -> str:
         """OIDC subject claim pattern for GitHub Actions"""
         return f"repo:{self.github_org}/{self.github_repo}:*"
+
+    @property
+    def slack_secret_name(self) -> str:
+        """Secrets Manager name for the Slack bot token (service/env/team/descriptor convention)"""
+        return f"slack/{self.environment}/{self.project_prefix}/bot-token"
