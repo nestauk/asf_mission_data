@@ -14,16 +14,24 @@ Creates:
 This stack is deployed once per environment.
 """
 
+import os
+
 import aws_cdk as cdk
 from aws_cdk import CfnOutput, RemovalPolicy, Stack
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_ecr as ecr
 from aws_cdk import aws_ecs as ecs
+from aws_cdk import aws_events as events
+from aws_cdk import aws_events_targets as events_targets
 from aws_cdk import aws_iam as iam
+from aws_cdk import aws_lambda as lambda_
 from aws_cdk import aws_logs as logs
 from aws_cdk import aws_s3 as s3
+from aws_cdk import aws_secretsmanager as secretsmanager
 from config.environments import EnvironmentConfig
 from constructs import Construct
+
+NOTIFIER_LAMBDA_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "lambdas", "notifier")
 
 
 class CoreStack(Stack):
@@ -245,6 +253,26 @@ class CoreStack(Stack):
             )
         )
         # -----------------------------------------------------------------
+        # EventBridge Rules Permissions (notifier task-stopped rule)
+        # -----------------------------------------------------------------
+        # Distinct from the EventBridge *Scheduler* permissions above:
+        # rules on the default bus are a separate service prefix (events:*),
+        # and the notifier's task-stopped rule won't deploy without it.
+        self.github_actions_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="EventBridgeRules",
+                actions=[
+                    "events:PutRule",
+                    "events:PutTargets",
+                    "events:DeleteRule",
+                    "events:RemoveTargets",
+                    "events:DescribeRule",
+                ],
+                resources=[f"arn:aws:events:{config.aws_region}:{config.aws_account_id}:rule/{config.project_prefix}-*"],
+            )
+        )
+
+        # -----------------------------------------------------------------
         # ECS Permissions (for triggering pipeline tasks)
         # -----------------------------------------------------------------
 
@@ -275,6 +303,18 @@ class CoreStack(Stack):
                     }
                 },
                 resources=[f"arn:aws:ecs:{config.aws_region}:{config.aws_account_id}:task-definition/{config.project_prefix}-*"],
+            )
+        )
+
+        # Tag-on-RunTask: trigger_pipeline.py attaches attribution tags
+        # (pipeline, stage, triggered_by, ...) when launching, which requires
+        # ecs:TagResource on the task being created
+        self.github_actions_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="ECSTagOnRunTask",
+                actions=["ecs:TagResource"],
+                resources=[f"arn:aws:ecs:{config.aws_region}:{config.aws_account_id}:task/{config.ecs_cluster_name}/*"],
+                conditions={"StringEquals": {"ecs:CreateAction": "RunTask"}},
             )
         )
 
@@ -431,12 +471,115 @@ class CoreStack(Stack):
                 "DATA_ROOT": f"s3://asf-mission-data-{config.environment}",
                 "ASF_ENVIRONMENT": config.environment,
             },
-            # Each task run gets a unique stream e.g. "pipeline/<task-id>"
+            # Each task run gets a unique stream: "pipeline/app/<task-id>"
+            # (prefix/container-name/task-id — the notifier Lambda builds
+            # its CloudWatch deep link from this exact shape)
             logging=ecs.LogDrivers.aws_logs(
                 log_group=self.log_group,
                 stream_prefix="pipeline",
             ),
         )
+
+        # =================================================================
+        # Pipeline Run Notifier (observability)
+        # =================================================================
+        # A container that OOMs or crashes cannot send its own "I failed"
+        # message, so the outcome is observed from outside: an EventBridge
+        # rule on ECS Task State Change → STOPPED invokes a Lambda that
+        # classifies the outcome, writes the authoritative run record to
+        # S3 (_meta/runs/), and posts to Slack (prod only).
+
+        # The bot token lives in Secrets Manager, created out-of-band —
+        # never in a CDK env var or template. This reference only wires IAM.
+        slack_secret = secretsmanager.Secret.from_secret_name_v2(
+            self,
+            "SlackBotTokenSecret",
+            config.slack_secret_name,
+        )
+
+        self.notifier_role = iam.Role(
+            self,
+            "NotifierRole",
+            role_name=f"asf-mission-data-{config.environment}-notifier-role",
+            assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
+            managed_policies=[iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaBasicExecutionRole")],
+        )
+
+        # Read attribution tags from the stopped task
+        self.notifier_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="DescribeTasks",
+                actions=["ecs:DescribeTasks"],
+                resources=[f"arn:aws:ecs:{config.aws_region}:{config.aws_account_id}:task/{config.ecs_cluster_name}/*"],
+            )
+        )
+
+        # Fetch the failure log tail for the Slack message
+        self.notifier_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="ReadPipelineLogs",
+                actions=["logs:GetLogEvents", "logs:FilterLogEvents"],
+                resources=[self.log_group.log_group_arn],
+            )
+        )
+
+        # Scoped to exactly this environment's secret (ARN gets a random
+        # suffix, which grant_read's wildcard covers)
+        slack_secret.grant_read(self.notifier_role)
+
+        # Read the container's manifest, write the authoritative run record
+        self.data_bucket.grant_read_write(self.notifier_role, "_meta/runs/*")
+
+        notifier_log_group = logs.LogGroup(
+            self,
+            "NotifierLogGroup",
+            log_group_name=f"/aws/lambda/asf-pipeline-notifier-{config.environment}",
+            retention=logs.RetentionDays.ONE_MONTH,
+            removal_policy=cdk.RemovalPolicy.DESTROY,
+        )
+
+        self.notifier_lambda = lambda_.Function(
+            self,
+            "NotifierFunction",
+            function_name=f"asf-pipeline-notifier-{config.environment}",
+            description="Classifies stopped pipeline tasks, records the run, alerts Slack",
+            runtime=lambda_.Runtime.PYTHON_3_12,
+            handler="handler.lambda_handler",
+            code=lambda_.Code.from_asset(NOTIFIER_LAMBDA_DIR),
+            role=self.notifier_role,
+            log_group=notifier_log_group,
+            timeout=cdk.Duration.seconds(30),
+            memory_size=128,
+            environment={
+                "ENVIRONMENT": config.environment,
+                "DATA_BUCKET": config.data_bucket_name,
+                "LOG_GROUP_NAME": self.log_group.log_group_name,
+                "SLACK_SECRET_NAME": config.slack_secret_name,
+                # Same image and stack shape in both environments; config
+                # decides. Dev failures stay quiet (they surface in the
+                # GitHub Action and ECS logs, where the person testing
+                # already is) — only prod pings the shared channel.
+                "SLACK_ALERTS_ENABLED": "true" if is_prod else "false",
+            },
+        )
+
+        # One rule covers every pipeline and every cadence (manual and
+        # scheduled runs stop the same way)
+        self.task_stopped_rule = events.Rule(
+            self,
+            "TaskStoppedRule",
+            rule_name=f"asf-pipeline-task-stopped-{config.environment}",
+            description=f"Invoke the run notifier when a pipeline task stops ({config.environment})",
+            event_pattern=events.EventPattern(
+                source=["aws.ecs"],
+                detail_type=["ECS Task State Change"],
+                detail={
+                    "lastStatus": ["STOPPED"],
+                    "clusterArn": [self.cluster.cluster_arn],
+                },
+            ),
+        )
+        self.task_stopped_rule.add_target(events_targets.LambdaFunction(self.notifier_lambda))
 
         # =================================================================
         # Outputs
