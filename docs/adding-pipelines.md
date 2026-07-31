@@ -105,20 +105,21 @@ Add an entry to [`pipelines.yaml`](../pipelines.yaml) at the root of the repo:
 pipelines:
   your_pipeline_name:
     owner: your_name
-    schedule: TBC # TODO
+    schedule: <format still TBC>
     description: One sentence describing what data this pipeline fetches
     source_url: https://example.gov.uk/the-source-page
     stages: [bronze, silver]
-    stack_name: tbc # TODO
 ```
 
 The pipeline name must be a unique key and must match the directory name you created under `asf_mission_data/pipeline/`. It is also the value you pass to `--pipeline` when running the pipeline via GitHub Actions or the trigger script.
 
 Include `gold` in `stages` if your pipeline has a gold stage.
 
-`pipelines.yaml` is config, not documentation. It's read directly by GitHub Actions and by the EventBridge schedule, so `schedule` and `stages` must be accurate for the pipeline to run correctly. `description` here should stay to one sentence, since it's surfaced in tooling rather than read as prose. Fuller documentation (what the pipeline does, quirks in the source, update frequency in human terms) belongs in the pipeline's own `README.md` (see step 9).
+`pipelines.yaml` is config, not documentation. It's read directly by GitHub Actions (and, once implemented, by the EventBridge schedule,) so `schedule` and `stages` must be accurate for the pipeline to run correctly. `description` here should stay to one sentence, since it's surfaced in tooling rather than read as prose. Fuller documentation (what the pipeline does, quirks in the source, update frequency in human terms) belongs in the pipeline's own `README.md` (see step 9).
 
-<!-- TODO: once infrastructure is finalised on how `stack_name` and `schedule` are used, update these instructions -->
+**On `schedule`:** all pipeline runs are currently manual — nothing reads this field yet. The agreed design (27 July 2026, not yet implemented) is for `pipelines.yaml` to become the source of truth for scheduling: a reconciler script will converge EventBridge Scheduler with the file's `schedule` values, creating/updating/deleting schedules to match. Scheduling will be prod-only; dev runs stay manual by design. Set `schedule` to your intended cadence now if you know it, but don't expect it to have any effect until this ships. See [infrastructure.md](../infrastructure/README.md#i-want-to-schedule-a-pipeline) for details.
+
+<!-- TODO: once scheduling infrastructure is finalised, confirm schedule expression syntax/timezone and update this section -->
 
 ## 3. Implement bronze
 
