@@ -87,7 +87,24 @@ uv run python -m asf_mission_data.run example --stage all
 ## Infrastructure
 
 Infrastructure is managed with [AWS CDK](https://aws.amazon.com/cdk/) (Python).
-See [infrastructure/README.md](infrastructure/README.md) for full documentation.
+
+**How this works, in three steps:**
+
+1. **Build**: our code (all pipelines) gets packaged into a single Docker
+   container image and pushed to ECR (a private store for container images).
+
+2. **Run**: to run a specific pipeline, someone manually triggers a task on
+   ECS Fargate (AWS's "run a container without managing a server" service),
+   telling it which pipeline to run from that shared image.
+
+3. **Land**: the pipeline writes its output data to an S3 bucket where it's picked up by downstream tools for analysis.
+
+> Note: there's no automatic scheduling yet (as of 31 July 2026), every run is triggered
+> manually at the moment.
+
+See [infrastructure/README.md](infrastructure/README.md) for full CDK
+documentation, or [docs/running-pipelines.md](docs/running-pipelines.md)
+for how to actually trigger a run.
 
 ---
 
