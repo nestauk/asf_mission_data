@@ -19,8 +19,8 @@ on:
         default: all
 
 env:
-  AWS_REGION: eu-west-2
   SLACK_CHANNEL: asf-data-pipeline-sandbox
+  AWS_REGION: ${{ vars.AWS_REGION }}
 
 jobs:
   trigger:

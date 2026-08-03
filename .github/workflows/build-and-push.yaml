@@ -3,7 +3,7 @@ name: Build and push Docker Image to ECR
 # Script environment variables
 env:
   ECR_REPO: asf-mission-data
-  AWS_REGION: eu-west-2
+  AWS_REGION: ${{ vars.AWS_REGION }}
 
 # Triggers
 on:
