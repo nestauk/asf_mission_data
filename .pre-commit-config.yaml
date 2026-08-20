@@ -21,7 +21,7 @@ repos:
 
     ### Python Tools ###
 -   repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.1
+    rev: v0.16.3
     hooks:
     -   id: ruff-check
         args: [--fix]
@@ -30,7 +30,7 @@ repos:
         name: "🐍 python · Format with Ruff"
 
 -   repo: https://github.com/abravalheri/validate-pyproject
-    rev: v0.25
+    rev: '0.26'
     hooks:
     -   id: validate-pyproject
         name: "🐍 python · Validate pyproject.toml"
@@ -38,7 +38,7 @@ repos:
 
     ### Data & Config Validation ###
 -   repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.37.4
+    rev: 0.38.0
     hooks:
     -   id: check-github-workflows
         name: "🐙 github-actions · Validate gh workflow files"

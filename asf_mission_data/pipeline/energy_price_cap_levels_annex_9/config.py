@@ -57,12 +57,15 @@ MONTH_NORMALISATION = {
 SILVER_TABLES_NODES_MAP = {"1c Consumption adjusted levels": "silver_energy_price_cap_annex_9_1c_consumption_adjusted_levels_parquet"}
 
 BENCHMARK_CONSUMPTION = {  # MWh per year
-    "Gas": 11.5,
-    "Electricity: Single-Rate Metering Arrangement": 2.7,
-    "Electricity: Multi-Register Metering Arrangement": 3.9,
+    "Gas": 9.5,  # old TDCV before July 26 change was 11.5
+    "Electricity: Single-Rate Metering Arrangement": 2.5,  # old TDCV before July 26 change was 2.7
+    "Electricity: Multi-Register Metering Arrangement": 3.4,  # old TDCV before July 26 change was 3.9
 }
 
 VAT = 0.05
+
+# 28AD Charge Restriction Period start dates for which VAT is zero-rated on electricity bill instead of the standard VAT rate
+ZERO_VAT_PERIOD_STARTS = ["2026-10-01", "2027-01-01"]
 
 COMPONENT_CATEGORY_MAP = {
     "DF": "Wholesale",  # Direct fuel
