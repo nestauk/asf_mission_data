@@ -278,6 +278,18 @@ class CoreStack(Stack):
             )
         )
 
+        # Tagging tasks at launch (RunTask with a tags parameter) needs
+        # ecs:TagResource on the task being created; the CreateAction
+        # condition stops the role retagging existing resources
+        self.github_actions_role.add_to_policy(
+            iam.PolicyStatement(
+                sid="ECSTagOnRunTask",
+                actions=["ecs:TagResource"],
+                conditions={"StringEquals": {"ecs:CreateAction": "RunTask"}},
+                resources=[f"arn:aws:ecs:{config.aws_region}:{config.aws_account_id}:task/{config.ecs_cluster_name}/*"],
+            )
+        )
+
         # -----------------------------------------------------------------
         # CloudWatch Logs Permissions
         # -----------------------------------------------------------------
@@ -364,6 +376,15 @@ class CoreStack(Stack):
             iam.PolicyStatement(
                 actions=["ecs:RunTask"],
                 resources=[f"arn:aws:ecs:{config.aws_region}:{config.aws_account_id}:task-definition/asf-mission-data-{config.environment}:*"],
+            )
+        )
+
+        # As above: allows schedules to tag the tasks they launch
+        self.scheduler_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["ecs:TagResource"],
+                conditions={"StringEquals": {"ecs:CreateAction": "RunTask"}},
+                resources=[f"arn:aws:ecs:{config.aws_region}:{config.aws_account_id}:task/{config.ecs_cluster_name}/*"],
             )
         )
 

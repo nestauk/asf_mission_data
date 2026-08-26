@@ -10,6 +10,7 @@ Usage:
 import argparse
 import os
 import sys
+import uuid
 from dataclasses import dataclass
 from typing import Any
 
@@ -175,7 +176,38 @@ def resolve_task_definition(image_tag: str, infra: InfraConfig, environment: str
     )
 
 
-def run_task(pipeline: str, stage: str, capacity_provider: str, task_definition: str, infra: InfraConfig) -> None:
+def build_task_tags(
+    *,
+    run_id: str,
+    pipeline: str,
+    stage: str,
+    environment: str,
+    triggered_by: str,
+    github_run_id: str | None = None,
+    git_sha: str | None = None,
+    image_tag: str | None = None,
+) -> list[dict[str, str]]:
+    values = {
+        "RunId": run_id,
+        "Pipeline": pipeline,
+        "Stage": stage,
+        "Environment": environment,
+        "TriggeredBy": triggered_by,
+        "GitHubRunId": github_run_id,
+        "GitSha": git_sha,
+        "ImageTag": image_tag,
+    }
+    return [{"key": key, "value": value} for key, value in values.items() if value is not None]
+
+
+def run_task(
+    pipeline: str,
+    stage: str,
+    capacity_provider: str,
+    task_definition: str,
+    infra: InfraConfig,
+    tags: list[dict[str, str]],
+) -> None:
     params: dict[str, Any] = {
         "cluster": infra.cluster,
         "taskDefinition": task_definition,
@@ -201,6 +233,7 @@ def run_task(pipeline: str, stage: str, capacity_provider: str, task_definition:
                 }
             ]
         },
+        "tags": tags,
     }
 
     client = boto3.client("ecs", region_name=AWS_REGION)
@@ -235,9 +268,14 @@ if __name__ == "__main__":
         infra = get_infra_config(args.environment)
     except (BotoCoreError, ClientError) as exc:
         emit_github_actions_annotation("error", f"Error looking up infrastructure: {exc}")
-        print(f"Error looking up infrastructure for '{args.environment}': {exc}", file=sys.stderr)
+        print(
+            f"Error looking up infrastructure for '{args.environment}': {exc}",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
+    run_id = str(uuid.uuid4())
+    print(f"Run ID: {run_id}")
     try:
         resolved = resolve_task_definition(args.image_tag, infra, args.environment)
     except (BotoCoreError, ClientError, ValueError) as exc:
@@ -249,10 +287,21 @@ if __name__ == "__main__":
     emit_github_actions_annotation("notice", f"Container image: {resolved.app_image}")
     print(f"Task definition: {resolved.task_definition}")
     print(f"Container image: {resolved.app_image}")
+    tags = build_task_tags(
+        run_id=run_id,
+        pipeline=args.pipeline,
+        stage=args.stage,
+        environment=args.environment,
+        triggered_by=os.environ.get("GITHUB_ACTOR", "manual"),
+        github_run_id=os.environ.get("GITHUB_RUN_ID"),
+        git_sha=os.environ.get("GITHUB_SHA"),
+        image_tag=args.image_tag,
+    )
     run_task(
         args.pipeline,
         args.stage,
         args.capacity_provider,
         resolved.task_definition,
         infra,
+        tags,
     )
