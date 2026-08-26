@@ -10,6 +10,11 @@ from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import (
 )
 
 # %%
+silver_df = storage.read_parquet(
+    "s3://asf-mission-data-dev/data/silver/energy_price_cap_levels/annex_9/latest/1c_consumption_adjusted_levels/1c_consumption_adjusted_levels.parquet"
+)
+
+# %%
 start_date_to_check = "2026-10-01"
 
 # %%
@@ -95,7 +100,7 @@ df[
 
 # %%
 electricity_tdcv = BENCHMARK_CONSUMPTION.get("Electricity: Single-Rate Metering Arrangement") * 1_000  # kWh/year
-electricity_unit_rate = 26.110065  # p/kWh
+electricity_unit_rate = 26.322252  # p/kWh
 electricity_tdcv * electricity_unit_rate / 100  # should match annual consumption-based cost
 
 # %%
@@ -109,7 +114,7 @@ df[
 
 # %%
 gas_tdcv = BENCHMARK_CONSUMPTION.get("Gas") * 1_000  # kWh/year
-gas_unit_rate = 7.325091  # p/kWh
+gas_unit_rate = 7.966458  # p/kWh
 gas_tdcv * gas_unit_rate / 100  # should match annual consumption-based cost
 
 # %%
