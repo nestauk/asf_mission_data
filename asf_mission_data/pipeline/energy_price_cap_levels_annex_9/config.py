@@ -64,9 +64,6 @@ BENCHMARK_CONSUMPTION = {  # MWh per year
 
 VAT = 0.05
 
-# 28AD Charge Restriction Period start dates for which VAT is zero-rated on electricity bill instead of the standard VAT rate
-ZERO_VAT_PERIOD_STARTS = ["2026-10-01", "2027-01-01"]
-
 COMPONENT_CATEGORY_MAP = {
     "DF": "Wholesale",  # Direct fuel
     "CM": "Wholesale",  # Capacity market

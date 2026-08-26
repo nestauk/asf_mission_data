@@ -13,8 +13,6 @@ from asf_mission_data import storage, utils
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.config import (
     BENCHMARK_CONSUMPTION,
     COMPONENT_CATEGORY_MAP,
-    VAT,
-    ZERO_VAT_PERIOD_STARTS,
 )
 from asf_mission_data.pipeline.energy_price_cap_levels_annex_9.schemas import (
     GOLD_1C_CONSUMPTION_ADJUSTED_LEVELS_WITH_VAT_SCHEMA,
@@ -74,83 +72,70 @@ def consumption_adjusted_levels_with_vat_df(
     """Add VAT as a tariff component and uprate the total values to include VAT.
 
     This function derives VAT-inclusive tariff values from the silver dataset, and
-    creates a new tariff component representing VAT (calculated as 5% of the
-    `Total_GB average` component) and adds it as a separate row. It also uprates
-    the `Total_GB average` values so that they include VAT.
-
-    UK government announced that VAT will be removed from electricity from
-    Oct 2026 to end of that financial year. Electricity is zero-rated during periods
-    in ZERO_VAT_PERIOD_STARTS. Gas remains subject to VAT during those periods.
-    Dual fuel VAT is derived directly from the raw `Total inc VAT` figure, since
-    that figure already reflects the correct combination of zero-rated electricity
-    and taxed gas.
+    creates a new tariff component representing VAT (calculated as the difference
+    between the `Total inc VAT` and `Total_GB average` components) and adds it as
+    a separate row. It also uprates the `Total_GB average` values so that they
+    include VAT, using the corresponding `Total inc VAT` values.
 
     Args:
         silver_df (pd.DataFrame): Silver-layer Annex 9 DataFrame containing tariff
             components, consumption levels, and annual values before VAT
-            adjustments.
+            adjustments. Must contain both `Total_GB average` and
+            `Total inc VAT` tariff components for every fuel.
 
     Returns:
-        pd.DataFrame: DataFrame containing the original tariff components,
-        VAT as a separate component, and updated `Total_GB average` values
-        that include VAT.
+        pd.DataFrame: DataFrame containing the original tariff components
+        (excluding `Total inc VAT`), VAT as a separate component, and updated
+        `Total_GB average` values that include VAT.
     """
+    for component in ("Total_GB average", "Total inc VAT"):
+        if not silver_df["Tariff component"].eq(component).any():
+            raise ValueError(f"Expected tariff component '{component}' not found in silver_df.")
 
-    # Total_GB average value used to calculate VAT component
-    total_mask = silver_df["Tariff component"].eq("Total_GB average")
-
-    if not total_mask.any():
-        raise ValueError("Expected tariff component 'Total_GB average' not found in silver_df.")
-
-    totals = silver_df.loc[total_mask].copy()
-
-    # Identify zero-VAT periods and individual-meter fuel types (as opposed to dual fuel)
-    zero_vat_period = totals["28AD Charge Restriction Period start"].isin(pd.to_datetime(ZERO_VAT_PERIOD_STARTS))
-    electricity_mask = totals["Fuel"].isin(
-        [
-            "Electricity: Single-Rate Metering Arrangement",
-            "Electricity: Multi-Register Metering Arrangement",
-        ]
-    )
-    gas_mask = totals["Fuel"].eq("Gas")
-    dual_fuel_mask = totals["Fuel"].eq("Dual fuel (implied)")
-
-    # Electricity is zero-rated during zero-VAT periods; gas always uses the standard rate
-    vat_rate = pd.Series(VAT, index=totals.index)
-    vat_rate.loc[zero_vat_period & electricity_mask] = 0
-
-    # VAT for electricity single/multi-register and gas rows: Total_GB average * rate
-    totals["vat_value"] = 0.0
-    individual_fuel_mask = electricity_mask | gas_mask
-    totals.loc[individual_fuel_mask, "vat_value"] = totals.loc[individual_fuel_mask, "value"] * vat_rate.loc[individual_fuel_mask]
-
-    # VAT for dual fuel rows: Total inc VAT - Total_GB average, taken directly from the raw silver data
-    # We are trusting that Ofgem will calculate Total inc VAT correctly for dual fuel in the periods with
-    # zero-VAT electricity
-    match_columns = [
+    # Columns that uniquely identify a row aside from "Tariff component",
+    # "value" and "metadata"
+    key_cols = [
         "Payment method",
+        "Fuel",
         "Consumption",
+        "28AD Charge Restriction Period",
         "28AD Charge Restriction Period start",
+        "28AD Charge Restriction Period end",
+        "28AD Charge Restriction Period interval",
     ]
-    total_inc_vat = silver_df.loc[silver_df["Tariff component"].eq("Total inc VAT")].set_index(match_columns)["value"]
-    dual_fuel_index = pd.MultiIndex.from_frame(totals.loc[dual_fuel_mask, match_columns])
-    totals.loc[dual_fuel_mask, "vat_value"] = total_inc_vat.loc[dual_fuel_index].to_numpy() - totals.loc[dual_fuel_mask, "value"].to_numpy()
 
-    # Add VAT as an individual tariff component to table
-    vat_rows = totals.copy()
+    total_gb_avg = silver_df[silver_df["Tariff component"] == "Total_GB average"].copy()
+    total_inc_vat = silver_df[silver_df["Tariff component"] == "Total inc VAT"].copy()
+
+    merged = total_gb_avg.merge(
+        total_inc_vat[key_cols + ["value"]],
+        on=key_cols,
+        how="left",
+        suffixes=("", "_inc_vat"),
+        validate="one_to_one",
+    )
+
+    if merged["value_inc_vat"].isna().any():
+        raise ValueError("Some 'Total_GB average' rows have no matching 'Total inc VAT' row.")
+
+    # VAT component = Total inc VAT - Total_GB average
+    vat_rows = merged.copy()
+    vat_rows["value"] = vat_rows["value_inc_vat"] - vat_rows["value"]
     vat_rows["Tariff component"] = "VAT"
-    vat_rows["value"] = vat_rows["vat_value"]
-    vat_rows = vat_rows.drop(columns="vat_value")
+    vat_rows = vat_rows.drop(columns="value_inc_vat")
 
-    # Uprate Total_GB average to include VAT; for dual fuel this reproduces Total inc VAT exactly
-    result = silver_df.copy()
-    result.loc[total_mask, "value"] += totals["vat_value"]
+    # Uprated Total_GB average = Total inc VAT value
+    uprated_total_gb_avg = merged.copy()
+    uprated_total_gb_avg["value"] = uprated_total_gb_avg["value_inc_vat"]
+    uprated_total_gb_avg = uprated_total_gb_avg.drop(columns="value_inc_vat")
 
-    # Remove now redundant "Total inc VAT" rows that were only previously present in
-    # the Dual fuel table
-    result = result[result["Tariff component"].ne("Total inc VAT")]
+    # All other rows, unchanged (drop original Total_GB average and Total inc VAT rows)
+    other_rows = silver_df[~silver_df["Tariff component"].isin(["Total_GB average", "Total inc VAT"])].copy()
 
-    return pd.concat([result, vat_rows], ignore_index=True)
+    return pd.concat(
+        [other_rows, uprated_total_gb_avg, vat_rows],
+        ignore_index=True,
+    )
 
 
 @check_output(
