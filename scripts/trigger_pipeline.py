@@ -8,10 +8,12 @@ Usage:
 """
 
 import argparse
+import json
 import os
 import sys
 import uuid
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from typing import Any
 
 import boto3
@@ -26,12 +28,63 @@ class InfraConfig:
     task_family: str
     subnet_ids: list[str]
     security_group_ids: list[str]
+    data_bucket: str
 
 
 @dataclass(frozen=True)
 class ResolvedTaskDefinition:
     task_definition: str
     app_image: str
+
+
+@dataclass(frozen=True)
+class RunRecord:
+    run_id: str
+    pipeline: str
+    stage: str
+    environment: str
+    status: str
+    status_reason: str
+    retryable: bool
+    action_required: bool
+    triggered_by: str
+
+    # These fields may be unavailable depending on how or why the task stopped.
+    failure_category: str | None = None
+    exit_code: int | None = None
+    stop_code: str | None = None
+    stopped_reason: str | None = None
+    started_at: str | None = None
+    stopped_at: str | None = None
+    duration_seconds: float | None = None
+    ecs_task_id: str | None = None
+    ecs_task_arn: str | None = None
+
+    # These fields are present only when the run originated from a context
+    # that supplied the corresponding deployment metadata
+    github_run_id: str | None = None
+    git_sha: str | None = None
+    image_tag: str | None = None
+    task_definition_arn: str | None = None
+    app_image: str | None = None
+
+    schema_version: int = 1
+    recorded_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a JSON dictionary representation of the record"""
+        return asdict(self)
+
+
+def write_run_record(bucket: str, record: RunRecord) -> None:
+    """Write a run record to S3 whether the run works or it fails"""
+    s3 = boto3.client("s3", region_name=AWS_REGION)
+    s3.put_object(
+        Bucket=bucket,
+        Key=f"_meta/runs/{record.run_id}.json",
+        Body=json.dumps(record.to_dict(), indent=2),
+        ContentType="application/json",
+    )
 
 
 def github_actions_enabled() -> bool:
@@ -60,6 +113,7 @@ def get_infra_config(environment: str) -> InfraConfig:
         task_family=f"asf-mission-data-{environment}",
         subnet_ids=outputs["SubnetIds"].split(","),
         security_group_ids=[outputs["SecurityGroupId"]],
+        data_bucket=outputs["DataBucketName"],
     )
 
 
@@ -176,7 +230,7 @@ def resolve_task_definition(image_tag: str, infra: InfraConfig, environment: str
     )
 
 
-def build_task_tags(
+def build_run_metadata(
     *,
     run_id: str,
     pipeline: str,
@@ -186,28 +240,83 @@ def build_task_tags(
     github_run_id: str | None = None,
     git_sha: str | None = None,
     image_tag: str | None = None,
-) -> list[dict[str, str]]:
+) -> dict[str, str]:
+    """Build the metadata describing one pipeline run.
+
+    This dictionary is the single source of truth for metadata that needs to
+    be sent to both ECS task tags and the application container environment.
+
+    Optional values are omitted so they aren't sent to AWS as null values.
+    """
     values = {
-        "RunId": run_id,
-        "Pipeline": pipeline,
-        "Stage": stage,
-        "Environment": environment,
-        "TriggeredBy": triggered_by,
-        "GitHubRunId": github_run_id,
-        "GitSha": git_sha,
-        "ImageTag": image_tag,
+        "run_id": run_id,
+        "pipeline": pipeline,
+        "stage": stage,
+        "environment": environment,
+        "triggered_by": triggered_by,
+        "github_run_id": github_run_id,
+        "git_sha": git_sha,
+        "image_tag": image_tag,
     }
-    return [{"key": key, "value": value} for key, value in values.items() if value is not None]
+
+    return {key: value for key, value in values.items() if value is not None}
+
+
+def build_task_tags(metadata: dict[str, str]) -> list[dict[str, str]]:
+    """Convert the metadata dict into the format expected for ECS task tags"""
+    return [{"key": key, "value": value} for key, value in metadata.items()]
+
+
+def build_environment_overrides(
+    metadata: dict[str, str],
+) -> list[dict[str, str]]:
+    """Convert run metadata into ECS container environment overrides.
+
+    The application receives the same run metadata as the ECS task, but with
+    explicit ASF-prefixed environment variable names to avoid collisions with
+    unrelated environment variables.
+    """
+    env_names = {
+        "run_id": "ASF_RUN_ID",
+        "pipeline": "ASF_PIPELINE",
+        "stage": "ASF_STAGE",
+        "environment": "ASF_ENVIRONMENT",
+        "triggered_by": "ASF_TRIGGERED_BY",
+        "github_run_id": "ASF_GITHUB_RUN_ID",
+        "git_sha": "ASF_GIT_SHA",
+        "image_tag": "ASF_IMAGE_TAG",
+    }
+
+    return [
+        {
+            "name": env_names[key],
+            "value": value,
+        }
+        for key, value in metadata.items()
+    ]
 
 
 def run_task(
-    pipeline: str,
-    stage: str,
+    metadata: dict[str, str],
     capacity_provider: str,
     task_definition: str,
     infra: InfraConfig,
-    tags: list[dict[str, str]],
-) -> None:
+) -> str:
+    """Launch one pipeline run as an ECS Fargate task.
+
+    The supplied metadata is the canonical description of the pipeline run.
+    This function is responsible for translating it into ECS task tags,
+    container environment variables, and the command override used to launch
+    the application.
+    """
+    tags = build_task_tags(metadata)
+    environment_overrides = build_environment_overrides(metadata)
+
+    # Pipeline and stage are part of the metadata, so the command
+    # being executed can't drift from the metadata attached to the task
+    pipeline = metadata["pipeline"]
+    stage = metadata["stage"]
+
     params: dict[str, Any] = {
         "cluster": infra.cluster,
         "taskDefinition": task_definition,
@@ -230,6 +339,7 @@ def run_task(
                 {
                     "name": "app",
                     "command": [pipeline, "--stage", stage],
+                    "environment": environment_overrides,
                 }
             ]
         },
@@ -240,16 +350,12 @@ def run_task(
     try:
         response = client.run_task(**params)
     except (BotoCoreError, ClientError) as exc:
-        emit_github_actions_annotation("error", f"Error calling ECS: {exc}")
-        print(f"Error calling ECS: {exc}", file=sys.stderr)
-        sys.exit(1)
+        raise RuntimeError(f"Error calling ECS: {exc}") from exc
 
     failures = response.get("failures", [])
     if failures:
-        for f in failures:
-            emit_github_actions_annotation("error", f"Task failed to launch: {f['reason']}")
-            print(f"Task failed to launch: {f['reason']}", file=sys.stderr)
-        sys.exit(1)
+        reasons = "; ".join([f["reason"] for f in failures])
+        raise RuntimeError(f"Task failed to launch: {reasons}")
 
     task_arn = response["tasks"][0]["taskArn"]
     task_id = task_arn.split("/")[-1]
@@ -260,10 +366,12 @@ def run_task(
         f"Watch it:     aws ecs describe-tasks --cluster {cluster_name} --tasks {task_id}"  # noqa: E501
     )
     print(f"Logs:         aws logs tail /ecs/{cluster_name} --follow")
+    return task_arn
 
 
 if __name__ == "__main__":
     args = parse_args()
+    run_id = str(uuid.uuid4())
     try:
         infra = get_infra_config(args.environment)
     except (BotoCoreError, ClientError) as exc:
@@ -274,8 +382,6 @@ if __name__ == "__main__":
         )
         sys.exit(1)
 
-    run_id = str(uuid.uuid4())
-    print(f"Run ID: {run_id}")
     try:
         resolved = resolve_task_definition(args.image_tag, infra, args.environment)
     except (BotoCoreError, ClientError, ValueError) as exc:
@@ -287,21 +393,63 @@ if __name__ == "__main__":
     emit_github_actions_annotation("notice", f"Container image: {resolved.app_image}")
     print(f"Task definition: {resolved.task_definition}")
     print(f"Container image: {resolved.app_image}")
-    tags = build_task_tags(
+
+    # Github metadata is only available when running in a GitHub Actions workflow, so we default to "manual" for local runs.
+    triggered_by = os.environ.get("GITHUB_ACTOR", "manual")
+    print(f"Triggered by: {triggered_by}")
+    github_run_id = os.environ.get("GITHUB_RUN_ID")
+    if github_run_id:
+        print(f"GitHub run ID: {github_run_id}")
+    git_sha = os.environ.get("GITHUB_SHA")
+    if git_sha:
+        print(f"Git SHA: {git_sha}")
+    print(f"Image tag: {args.image_tag}")
+    # Build the canonical description of this pipeline run once, before handing
+    # it to the AWS-specific launch code
+    run_metadata = build_run_metadata(
         run_id=run_id,
         pipeline=args.pipeline,
         stage=args.stage,
         environment=args.environment,
-        triggered_by=os.environ.get("GITHUB_ACTOR", "manual"),
-        github_run_id=os.environ.get("GITHUB_RUN_ID"),
-        git_sha=os.environ.get("GITHUB_SHA"),
+        triggered_by=triggered_by,
+        github_run_id=github_run_id,
+        git_sha=git_sha,
         image_tag=args.image_tag,
     )
-    run_task(
-        args.pipeline,
-        args.stage,
-        args.capacity_provider,
-        resolved.task_definition,
-        infra,
-        tags,
-    )
+
+    try:
+        task_arn = run_task(
+            metadata=run_metadata,
+            capacity_provider=args.capacity_provider,
+            task_definition=resolved.task_definition,
+            infra=infra,
+        )
+    except RuntimeError as exc:
+        emit_github_actions_annotation("error", str(exc))
+        print(str(exc), file=sys.stderr)
+        record = RunRecord(
+            run_id=run_id,
+            pipeline=args.pipeline,
+            stage=args.stage,
+            environment=args.environment,
+            status="infrastructure_failure",
+            failure_category="launch_rejected",
+            status_reason=str(exc),
+            retryable=True,
+            action_required=True,
+            triggered_by=triggered_by,
+            github_run_id=github_run_id,
+            git_sha=git_sha,
+            image_tag=args.image_tag,
+            task_definition_arn=resolved.task_definition,
+        )
+        try:
+            write_run_record(infra.data_bucket, record)
+        except (BotoCoreError, ClientError) as s3_exc:
+            print(
+                f"Warning: could not write run record: {s3_exc}",
+                file=sys.stderr,
+            )
+        sys.exit(1)
+
+    print(f"RUN_ID={run_id}")

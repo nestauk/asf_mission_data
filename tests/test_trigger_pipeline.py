@@ -6,6 +6,25 @@ import pytest_mock
 from scripts import trigger_pipeline
 
 
+@pytest.fixture
+def run_id():
+    run_id = "run-123"
+
+    return run_id
+
+
+@pytest.fixture
+def run_task_metadata(run_id):
+    metadata = trigger_pipeline.build_run_metadata(
+        run_id=run_id,
+        pipeline="energy_price_cap_levels_annex_9",
+        stage="all",
+        environment="dev",
+        triggered_by="alex",
+    )
+    return metadata
+
+
 def test_parse_args_defaults_to_standard_fargate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -67,11 +86,13 @@ FAKE_INFRA = trigger_pipeline.InfraConfig(
     task_family="asf-mission-data-dev",
     subnet_ids=["subnet-abc", "subnet-def"],
     security_group_ids=["sg-0539fd44b1f27895b"],
+    data_bucket="asf-mission-data-dev",
 )
 
 
 def test_run_task_uses_explicit_capacity_provider(
     mocker: pytest_mock.MockerFixture,
+    run_task_metadata: dict[str, str],
 ) -> None:
     ecs_client = mocker.Mock()
     ecs_client.run_task.return_value = {
@@ -80,16 +101,21 @@ def test_run_task_uses_explicit_capacity_provider(
     }
     boto_client = mocker.patch("scripts.trigger_pipeline.boto3.client", return_value=ecs_client)
 
-    trigger_pipeline.run_task("example", "all", "FARGATE", "asf-mission-data-dev", FAKE_INFRA)
+    trigger_pipeline.run_task(
+        metadata=run_task_metadata,
+        capacity_provider="FARGATE",
+        task_definition="asf-mission-data-dev",
+        infra=FAKE_INFRA,
+    )
 
     boto_client.assert_called_once_with("ecs", region_name=trigger_pipeline.AWS_REGION)
     ecs_client.run_task.assert_called_once()
     params = ecs_client.run_task.call_args.kwargs
     assert params["capacityProviderStrategy"] == [{"capacityProvider": "FARGATE", "weight": 1}]
     assert params["overrides"]["containerOverrides"][0]["command"] == [
-        "example",
+        run_task_metadata["pipeline"],
         "--stage",
-        "all",
+        run_task_metadata["stage"],
     ]
 
 
@@ -192,7 +218,15 @@ def test_parse_args_image_tag_override(monkeypatch):
     """
     When --image-tag is given explicitly, it overrides the default
     """
-    monkeypatch.setattr("sys.argv", ["trigger_pipeline.py", "example", "--image-tag", "56-feature-new-pipeline-latest"])
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "trigger_pipeline.py",
+            "example",
+            "--image-tag",
+            "56-feature-new-pipeline-latest",
+        ],
+    )
 
     args = trigger_pipeline.parse_args()
 
@@ -201,7 +235,14 @@ def test_parse_args_image_tag_override(monkeypatch):
 
 def test_get_app_container_image_raises_when_app_container_missing() -> None:
     with pytest.raises(ValueError, match="does not contain an 'app' container"):
-        trigger_pipeline.get_app_container_image([{"name": "sidecar", "image": "123.dkr.ecr.eu-west-2.amazonaws.com/sidecar:latest"}])
+        trigger_pipeline.get_app_container_image(
+            [
+                {
+                    "name": "sidecar",
+                    "image": "123.dkr.ecr.eu-west-2.amazonaws.com/sidecar:latest",
+                }
+            ]
+        )
 
 
 def test_get_ecr_repository_name_returns_repository_segment() -> None:
@@ -224,7 +265,12 @@ def test_resolve_task_definition_raises_for_missing_image_tag(mocker) -> None:
     ecr_client = mocker.Mock()
     ecr_client.batch_get_image.return_value = {
         "images": [],
-        "failures": [{"failureCode": "ImageNotFound", "failureReason": "Requested image not found"}],
+        "failures": [
+            {
+                "failureCode": "ImageNotFound",
+                "failureReason": "Requested image not found",
+            }
+        ],
     }
 
     def boto3_client(service_name: str, region_name: str):
@@ -240,3 +286,57 @@ def test_resolve_task_definition_raises_for_missing_image_tag(mocker) -> None:
         trigger_pipeline.resolve_task_definition("44-feat-image", FAKE_INFRA, "dev")
 
     ecs_client.register_task_definition.assert_not_called()
+
+
+def test_trigger_passes_same_run_id_to_tags_and_container(
+    mocker: pytest_mock.MockerFixture,
+    run_id: str,
+    run_task_metadata: dict[str, str],
+) -> None:
+    ecs_client = mocker.Mock()
+    ecs_client.run_task.return_value = {
+        "tasks": [{"taskArn": "arn:aws:ecs:eu-west-2:123:task/cluster/task-123"}],
+        "failures": [],
+    }
+    mocker.patch("scripts.trigger_pipeline.boto3.client", return_value=ecs_client)
+
+    trigger_pipeline.run_task(
+        metadata=run_task_metadata,
+        capacity_provider="FARGATE",
+        task_definition="asf-mission-data-dev",
+        infra=FAKE_INFRA,
+    )
+
+    request = ecs_client.run_task.call_args.kwargs
+
+    tags = {tag["key"]: tag["value"] for tag in request["tags"]}
+
+    app_override = next(override for override in request["overrides"]["containerOverrides"] if override["name"] == "app")
+
+    env = {item["name"]: item["value"] for item in app_override["environment"]}
+
+    assert tags["run_id"] == run_id
+    assert env["ASF_RUN_ID"] == run_id
+
+
+def test_run_task_raises_when_ecs_cant_launch(
+    mocker: pytest_mock.MockerFixture,
+    run_task_metadata: dict[str, str],
+) -> None:
+    ecs_client = mocker.Mock()
+    ecs_client.run_task.return_value = {
+        "tasks": [],
+        "failures": [{"reason": "RESOURCE:MEMORY"}],
+    }
+    mocker.patch(
+        "scripts.trigger_pipeline.boto3.client",
+        return_value=ecs_client,
+    )
+
+    with pytest.raises(RuntimeError, match="RESOURCE:MEMORY"):
+        trigger_pipeline.run_task(
+            metadata=run_task_metadata,
+            capacity_provider="FARGATE",
+            task_definition="asf-mission-data-dev",
+            infra=FAKE_INFRA,
+        )
