@@ -9,14 +9,12 @@ from importlib.metadata import version
 from hamilton import driver
 
 from asf_mission_data import storage, utils
-from asf_mission_data.pipeline.heat_pump_deployment_statistics import (
-    bronze,
-    silver,
-)
+from asf_mission_data.pipeline.heat_pump_deployment_statistics import bronze, gold, silver
 from asf_mission_data.pipeline.heat_pump_deployment_statistics.config import (
     COLLECTION_URL,
     DATASET_PREFIX,
     FILE_LINK_TEXT,
+    GOLD_TABLES_NODES_MAP,
     PAGE_LINK_TEXT,
     PUBLISHER,
     SILVER_TABLES_NODES_MAP,
@@ -112,6 +110,48 @@ def run_silver_pipeline() -> None:
         )
 
 
+def build_gold_driver(silver_table_prefix: str) -> driver.Driver:
+    """Construct a general Hamilton driver configured to execute gold layer DAGs from specified silver tables in
+    the Heat Pump Deployment Statistics pipeline.
+    """
+    return (
+        driver.Builder()
+        .with_modules(gold)
+        .with_config(
+            {
+                "dataset_prefix": DATASET_PREFIX,
+                "silver_table_prefix": silver_table_prefix,
+            }
+        )
+        .build()
+    )
+
+
+def run_gold_pipeline() -> None:
+    """Run the gold layer for the Heat Pump Deployment Statistics pipeline.
+
+    Gold datasets generated:
+    1. Table 1.1 with quarter-on-quarter change values by technology type.
+    2. Table 1.2 with quarter-on-quater change values by country or region.
+    """
+
+    for silver_table_prefix, output_nodes in GOLD_TABLES_NODES_MAP.items():
+        driver = build_gold_driver(silver_table_prefix=silver_table_prefix)
+
+        results = driver.execute(output_nodes + [f"{silver_table_prefix}_latest_publication_date"])
+
+        for node in output_nodes:
+            dag_png = driver.visualize_execution([node]).pipe(format="png")
+            accompanying_filename = node.replace("_parquet", "")
+            storage.save_dag(
+                layer_prefix="gold",
+                dataset_prefix=DATASET_PREFIX,
+                accompanying_filename=accompanying_filename,
+                dag_image=dag_png,
+                date_stamp=f"published={utils.normalise_date_string(results[f'{silver_table_prefix}_latest_publication_date'])}",
+            )
+
+
 def run(stage: str = "bronze", extra_args: list[str] | None = None) -> None:
     """Pipeline execution entry point."""
     if stage in ("bronze", "all"):
@@ -123,3 +163,8 @@ def run(stage: str = "bronze", extra_args: list[str] | None = None) -> None:
         logger.info("Starting silver stage")
         run_silver_pipeline()
         logger.info("Completed silver stage")
+
+    if stage in ("gold", "all"):
+        logger.info("Starting gold stage")
+        run_gold_pipeline()
+        logger.info("Completed gold stage")

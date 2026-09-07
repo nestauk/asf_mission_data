@@ -39,6 +39,22 @@ Ingests data on the number of heat pumps installed in the UK, only includes thos
   - `StartStringValidator` on table name and source citation.
   - Pandera schema checks on wide and final silver table.
 
+### Gold
+
+#### `table_1_1`
+- **Description**: Silver Table 1.1 table augmented with quarter-on-quarter changes by technology type.
+- **Input**: `table_1_1` silver table
+- **Output**: `table_1_1.parquet`
+- **Validators**:
+  - Pandera schema check on final gold table.
+
+#### `table_1_2`
+- **Description**: Silver Table 1.2 table augmented with quarter-on-quarter changes by country/region.
+- **Input**: `table_1_2` silver table
+- **Output**: `table_1_2.parquet`
+- **Validators**:
+  - Pandera schema check on final gold table.
+
 ---
 
 ## Notes
@@ -48,4 +64,4 @@ Ingests data on the number of heat pumps installed in the UK, only includes thos
 
 ---
 
-*Last updated: 25 June 2026 by Elysia Lucas*
+*Last updated: 07 September 2026 by Elysia Lucas*
