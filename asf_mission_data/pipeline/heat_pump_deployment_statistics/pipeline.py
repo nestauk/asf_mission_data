@@ -13,9 +13,7 @@ from asf_mission_data.pipeline.heat_pump_deployment_statistics import bronze, go
 from asf_mission_data.pipeline.heat_pump_deployment_statistics.config import (
     COLLECTION_URL,
     DATASET_PREFIX,
-    FILE_LINK_TEXT,
     GOLD_TABLES_NODES_MAP,
-    PAGE_LINK_TEXT,
     PUBLISHER,
     SILVER_TABLES_NODES_MAP,
 )
@@ -35,8 +33,6 @@ def build_bronze_driver() -> driver.Driver:
             {
                 "dataset_prefix": DATASET_PREFIX,
                 "collection_url": COLLECTION_URL,
-                "page_link_text": PAGE_LINK_TEXT,
-                "file_link_text": FILE_LINK_TEXT,
                 "publisher": PUBLISHER,
                 "pipeline_version": version("asf-mission-data"),
                 "bronze_ingest_timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
