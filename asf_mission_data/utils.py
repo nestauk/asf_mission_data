@@ -210,6 +210,41 @@ def safe_get_govuk_response(data: dict, *keys: str | int) -> any:
     return data
 
 
+def fetch_govuk_latest_release_api_response(collection_url: str) -> dict:
+    """Fetch the latest release metadata from the GOV.UK Content API."""
+    collection_data = fetch_govuk_content(collection_url)
+    documents = safe_get_govuk_response(collection_data, "links", "documents")
+    latest = sorted(documents, key=lambda x: x["public_updated_at"], reverse=True)[0]
+    return fetch_govuk_content(latest["web_url"])
+
+
+def extract_govuk_latest_release_file_url(
+    latest_release_api_response: dict,
+    file_content_type: str = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+) -> str:
+    """Extract the latest Excel file URL from the GOV.UK Content API response."""
+    attachments = safe_get_govuk_response(latest_release_api_response, "details", "attachments")
+    try:
+        file_url = next(a["url"] for a in attachments if a["content_type"] == file_content_type)
+        logger.info("Selected heat pump source file URL: %s", file_url)
+        return file_url
+    except StopIteration as e:
+        raise ValueError(f"Could not find attachment with content type '{file_content_type}'") from e
+
+
+def extract_govuk_latest_release_page_url(latest_release_api_response: dict) -> str:
+    """Extract the URL of the latest release page."""
+    release_page_url = safe_get_govuk_response(
+        latest_release_api_response,
+        "links",
+        "available_translations",
+        0,
+        "web_url",
+    )
+    logger.info("Selected heat pump release page URL: %s", release_page_url)
+    return release_page_url
+
+
 def standardise_column_names(df: pd.DataFrame) -> pd.DataFrame:
     """Standardise column names to lowercase with underscores."""
     df.columns = df.columns.str.strip().str.lower().str.replace(r"\s+", "_", regex=True).str.replace(r"[^\w]", "_", regex=True)

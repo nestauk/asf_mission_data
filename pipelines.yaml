@@ -25,3 +25,9 @@ pipelines:
     description: UK Government data on the number of heat pumps installed in the UK
     source_url: hhttps://www.gov.uk/government/collections/heat-pump-deployment-statistics
     stages: [bronze, silver]
+  boiler_upgrade_scheme_statistics:
+    owner: Elysia
+    schedule: TBC
+    description: DESNZ Boiler Upgrade Scheme statistics monitoring uptake of the scheme to install low carbon technologies
+    source_url: https://www.gov.uk/government/collections/boiler-upgrade-scheme-statistics
+    stages: [bronze]
