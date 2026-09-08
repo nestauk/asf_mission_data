@@ -14,6 +14,28 @@ logger = logging.getLogger(__name__)
 
 
 # ----------------------------------
+# Common helpers
+# ----------------------------------
+
+
+def _add_quarterly_change(df: pd.DataFrame, groupby_col: str) -> pd.DataFrame:
+    """Sort by quarter and add change / pct-change from the previous quarter, per group."""
+    df = df.sort_values("installation_quarter_start")
+    prev_value = df.groupby([groupby_col])["value"].shift(1)
+
+    df["change_from_previous_quarter"] = df["value"] - prev_value
+    df["pct_change_from_previous_quarter"] = df.groupby([groupby_col])["value"].pct_change().mul(100).round(2)
+
+    # 0 -> 0 gives NaN (0/0 undefined); treat as 0% change, but only when a
+    # previous quarter actually exists — leave first-quarter rows as NaN,
+    # consistent with change_from_previous_quarter.
+    flat_zero = prev_value.notna() & (prev_value == 0) & (df["value"] == 0)
+    df.loc[flat_zero, "pct_change_from_previous_quarter"] = 0.0
+
+    return df
+
+
+# ----------------------------------
 # Table 1.1
 # ----------------------------------
 
@@ -48,10 +70,7 @@ def gold_table_1_1_df(
 ) -> pd.DataFrame:
     """Augments silver table with quarter-on-quarter changes (absolute and percentage)."""
     df = silver_table_1_1_df.copy()
-    # Add change from previous quarter
-    df = df.sort_values("installation_quarter_start")
-    df["change_from_previous_quarter"] = df.groupby(["type"])["value"].diff()
-    df["pct_change_from_previous_quarter"] = df.groupby(["type"])["value"].pct_change().mul(100).round(2)
+    df = _add_quarterly_change(df, "type")
     logger.info(
         "Produced gold table 'table_1_1': rows=%d",
         len(df),
@@ -108,10 +127,7 @@ def gold_table_1_2_df(
 ) -> pd.DataFrame:
     """Augments silver table with quarter-on-quarter changes (absolute and percentage)."""
     df = silver_table_1_2_df.copy()
-    # Add change from previous quarter
-    df = df.sort_values("installation_quarter_start")
-    df["change_from_previous_quarter"] = df.groupby(["country_or_region"])["value"].diff()
-    df["pct_change_from_previous_quarter"] = df.groupby(["country_or_region"])["value"].pct_change().mul(100).round(2)
+    df = _add_quarterly_change(df, "country_or_region")
     logger.info(
         "Produced gold table 'table_1_2': rows=%d",
         len(df),
