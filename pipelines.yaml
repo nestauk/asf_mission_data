@@ -24,4 +24,4 @@ pipelines:
     schedule:  TBC
     description: UK Government data on the number of heat pumps installed in the UK
     source_url: hhttps://www.gov.uk/government/collections/heat-pump-deployment-statistics
-    stages: [bronze, silver]
+    stages: [bronze, silver, gold]
