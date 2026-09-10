@@ -30,15 +30,15 @@ e.g., in the `example` pipeline silver stage:
 def bronze_bank_holidays_json(bronze_bank_holidays_uri: str) -> dict:
     return storage.read_json(bronze_bank_holidays_uri)
 
-def flattened_bank_holidays_df(bronze_bank_holidays_json: dict) -> pd.DataFrame:
-    ...
 
-def parsed_bank_holidays_df(flattened_bank_holidays_df: pd.DataFrame) -> pd.DataFrame:
-    ...
+def flattened_bank_holidays_df(bronze_bank_holidays_json: dict) -> pd.DataFrame: ...
+
+
+def parsed_bank_holidays_df(flattened_bank_holidays_df: pd.DataFrame) -> pd.DataFrame: ...
+
 
 @check_output(schema=SILVER_BANK_HOLIDAYS_SCHEMA, importance="fail")
-def validated_bank_holidays_df(parsed_bank_holidays_df: pd.DataFrame) -> pd.DataFrame:
-    ...
+def validated_bank_holidays_df(parsed_bank_holidays_df: pd.DataFrame) -> pd.DataFrame: ...
 ```
 
 The `@check_output` decorator on `validated_bank_holidays_df` fails the pipeline if the node's output doesn't match `SILVER_BANK_HOLIDAYS_SCHEMA`.
@@ -48,9 +48,16 @@ Calling for `validated_bank_holidays_df` triggers the full chain: `parsed_bank_h
 Some arguments, like `bronze_bank_holidays_uri` above, aren't produced by another function; they're constants such as `dataset_prefix` or `collection_url`. These are supplied via `with_config()` when building the driver in `pipeline.py`:
 
 ```python
-dr = driver.Builder().with_modules(silver).with_config({
-    "dataset_prefix": DATASET_PREFIX,
-}).build()
+dr = (
+    driver.Builder()
+    .with_modules(silver)
+    .with_config(
+        {
+            "dataset_prefix": DATASET_PREFIX,
+        }
+    )
+    .build()
+)
 ```
 
 Config values are matched by name the same way function outputs are, so `dataset_prefix` in the config satisfies any function argument named `dataset_prefix`.
@@ -282,13 +289,15 @@ def build_bronze_driver() -> driver.Driver:
     return (
         driver.Builder()
         .with_modules(bronze)
-        .with_config({
-            "dataset_prefix": DATASET_PREFIX,
-            "publisher": PUBLISHER,
-            "collection_url": COLLECTION_URL,
-            "pipeline_version": version("asf-mission-data"),
-            "bronze_ingest_timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
-        })
+        .with_config(
+            {
+                "dataset_prefix": DATASET_PREFIX,
+                "publisher": PUBLISHER,
+                "collection_url": COLLECTION_URL,
+                "pipeline_version": version("asf-mission-data"),
+                "bronze_ingest_timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+            }
+        )
         .build()
     )
 ```
@@ -297,12 +306,7 @@ If a stage produces multiple output tables from the same source (e.g. several sh
 
 ```python
 def build_silver_driver(sheet_name: str) -> driver.Driver:
-    return (
-        driver.Builder()
-        .with_modules(silver)
-        .with_config({"dataset_prefix": DATASET_PREFIX, "sheet_name": sheet_name})
-        .build()
-    )
+    return driver.Builder().with_modules(silver).with_config({"dataset_prefix": DATASET_PREFIX, "sheet_name": sheet_name}).build()
 ```
 
 ### Running stages
