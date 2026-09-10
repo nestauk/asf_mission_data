@@ -43,7 +43,7 @@ def latest_file_url(
     """Extract the latest Excel file URL from the GOV.UK Content API response."""
     attachments = utils.safe_get_govuk_response(latest_release_api_response, "details", "attachments")
     try:
-        file_url = next(a["url"] for a in attachments if a["content_type"] == file_content_type)
+        file_url = next(a["url"] for a in attachments if a.get("attachment_type") == "file" and a.get("content_type") == file_content_type)
         logger.info("Selected heat pump deployment stats source file URL: %s", file_url)
         return file_url
     except StopIteration as e:
