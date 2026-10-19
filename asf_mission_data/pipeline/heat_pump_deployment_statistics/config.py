@@ -42,7 +42,7 @@ TABLE_1_2_VALUE_VARS = list(GEOGRAPHIC_LEVEL_MAP.keys())
 GEOGRAPHIC_LEVELS = list(set(GEOGRAPHIC_LEVEL_MAP.values()))
 AREA_CODES_LOOKUP = {
     "United Kingdom": "K02000001",
-    "England and Wales": "N/A",
+    "England and Wales": "K04000001",
     "England": "E92000001",
     "North East": "E12000001",
     "North West": "E12000002",
