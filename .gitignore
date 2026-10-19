@@ -31,6 +31,8 @@ coverage.xml
 *.swp
 *.swo
 *~
+skills-lock.json
+
 
 # OS files
 .DS_Store
@@ -42,6 +44,11 @@ Thumbs.db
 .env.local
 .env.*.local
 infrastructure/.env
+.env.*
+!.env.example
+.agents/skills/
+.claude/settings.local.json
+.claude/skills/
 
 # Local data and pipeline output
 # When running pipelines locally with DATA_ROOT=/tmp/pipeline-dev or similar,
