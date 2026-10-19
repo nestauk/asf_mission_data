@@ -24,7 +24,7 @@ def _add_quarterly_change(df: pd.DataFrame, groupby_col: str) -> pd.DataFrame:
     prev_value = df.groupby([groupby_col])["value"].shift(1)
 
     df["change_from_previous_quarter"] = df["value"] - prev_value
-    df["pct_change_from_previous_quarter"] = df.groupby([groupby_col])["value"].pct_change().mul(100).round(2)
+    df["pct_change_from_previous_quarter"] = df.groupby([groupby_col])["value"].pct_change().mul(100)
 
     # 0 -> 0 gives NaN (0/0 undefined); treat as 0% change, but only when a
     # previous quarter actually exists — leave first-quarter rows as NaN,
