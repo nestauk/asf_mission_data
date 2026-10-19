@@ -32,7 +32,7 @@ def latest_release_page_url(latest_release_api_response: dict) -> str:
         0,
         "web_url",
     )
-    logger.info("Selected heat pump release page URL: %s", release_page_url)
+    logger.info("Selected heat pump deployment stats release page URL: %s", release_page_url)
     return release_page_url
 
 
@@ -44,7 +44,7 @@ def latest_file_url(
     attachments = utils.safe_get_govuk_response(latest_release_api_response, "details", "attachments")
     try:
         file_url = next(a["url"] for a in attachments if a.get("attachment_type") == "file" and a.get("content_type") == file_content_type)
-        logger.info("Selected heat pump source file URL: %s", file_url)
+        logger.info("Selected heat pump deployment stats source file URL: %s", file_url)
         return file_url
     except StopIteration as e:
         raise ValueError(f"Could not find attachment with content type '{file_content_type}'") from e
@@ -59,7 +59,7 @@ def latest_file_content(latest_file_url: str) -> bytes:
 def latest_filename(latest_file_url: str) -> str:
     """Extract file name of downloaded data file."""
     filename = Path(latest_file_url).name
-    logger.info("Selected heat pump workbook: %s", filename)
+    logger.info("Selected heat pump deployment stats workbook: %s", filename)
     return filename
 
 
@@ -71,7 +71,7 @@ def latest_publication_date(latest_release_api_response: dict) -> str:
         raise ValueError("No change history (i.e. publication date) found in API response for latest release.")
     raw = utils.safe_get_govuk_response(change_history, 0, "public_timestamp")
     publication_date = datetime.strptime(raw, "%Y-%m-%dT%H:%M:%SZ").strftime("%d %B %Y")
-    logger.info("Detected heat pump publication date: %s", publication_date)
+    logger.info("Detected heat pump deployment stats publication date: %s", publication_date)
     return publication_date
 
 
@@ -108,7 +108,7 @@ def bronze_heat_pump_deployment_statistics_file(
 ) -> None:
     """Ingest downloaded data file and accompanying metadata to bronze-layer storage."""
     logger.info(
-        "Writing heat pump bronze dataset: filename=%s publication_date=%s",
+        "Writing heat pump deployment stats bronze dataset: filename=%s publication_date=%s",
         latest_filename,
         latest_publication_date,
     )

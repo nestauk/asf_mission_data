@@ -72,7 +72,7 @@ def notes_lookup(
     df = df.reset_index(drop=True)
     df.columns.name = None
     notes = dict(zip(df["Note number"], df["Note text"], strict=False))
-    logger.debug("Loaded %d heat pump notes from workbook", len(notes))
+    logger.debug("Loaded %d heat pump deployment stats notes from workbook", len(notes))
     return notes
 
 
