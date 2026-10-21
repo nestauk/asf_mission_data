@@ -23,5 +23,5 @@ pipelines:
     owner: Elysia
     schedule:  TBC
     description: UK Government data on the number of heat pumps installed in the UK
-    source_url: hhttps://www.gov.uk/government/collections/heat-pump-deployment-statistics
-    stages: [bronze, silver]
+    source_url: https://www.gov.uk/government/collections/heat-pump-deployment-statistics
+    stages: [bronze, silver, gold]

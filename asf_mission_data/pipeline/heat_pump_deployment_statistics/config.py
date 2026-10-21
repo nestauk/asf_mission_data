@@ -5,8 +5,6 @@ Configuration constants for the Heat Pump Deployment Statistics pipeline.
 DATASET_PREFIX = "heat_pump_deployment_statistics"
 PUBLISHER = "Department for Energy Security and Net Zero"
 COLLECTION_URL = "https://www.gov.uk/government/collections/heat-pump-deployment-statistics"
-PAGE_LINK_TEXT = "Heat pump deployment statistics:"
-FILE_LINK_TEXT = "Heat pump deployment statistics:"
 
 # Excel sheet name - Silver table Hamilton output node
 SILVER_TABLES_NODES_MAP = {
@@ -44,7 +42,7 @@ TABLE_1_2_VALUE_VARS = list(GEOGRAPHIC_LEVEL_MAP.keys())
 GEOGRAPHIC_LEVELS = list(set(GEOGRAPHIC_LEVEL_MAP.values()))
 AREA_CODES_LOOKUP = {
     "United Kingdom": "K02000001",
-    "England and Wales": "N/A",
+    "England and Wales": "K04000001",
     "England": "E92000001",
     "North East": "E12000001",
     "North West": "E12000002",
@@ -61,3 +59,9 @@ AREA_CODES_LOOKUP = {
     "Unknown": "N/A",
 }
 AREA_CODES = list(set(AREA_CODES_LOOKUP.values()))
+
+# Silver table prefix - Gold table Hamilton output node
+GOLD_TABLES_NODES_MAP = {
+    "table_1_1": ["gold_table_1_1_parquet"],
+    "table_1_2": ["gold_table_1_2_parquet"],
+}

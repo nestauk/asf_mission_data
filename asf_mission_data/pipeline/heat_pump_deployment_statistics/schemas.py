@@ -68,3 +68,35 @@ SILVER_TABLE_1_2_SCHEMA = pa.DataFrameSchema(
     },
     strict=True,
 )
+
+GOLD_TABLE_1_1_SCHEMA = pa.DataFrameSchema(
+    {
+        "installation_quarter": Column(str, nullable=False),
+        "installation_quarter_start": Column(pd.Timestamp, nullable=False),
+        "installation_quarter_end": Column(pd.Timestamp, nullable=False),
+        "notes": Column(str, nullable=True),
+        "type": Column(str, nullable=False, checks=Check.isin(TABLE_1_1_VALUE_VARS)),
+        "value": Column(int, nullable=False, checks=Check.ge(0)),
+        "metadata": Column(object, nullable=False),
+        "change_from_previous_quarter": Column(float, nullable=True),
+        "pct_change_from_previous_quarter": Column(float, nullable=True),
+    },
+    strict=True,
+)
+
+GOLD_TABLE_1_2_SCHEMA = pa.DataFrameSchema(
+    {
+        "installation_quarter": Column(str, nullable=False),
+        "installation_quarter_start": Column(pd.Timestamp, nullable=False),
+        "installation_quarter_end": Column(pd.Timestamp, nullable=False),
+        "notes": Column(str, nullable=True),
+        "country_or_region": Column(str, nullable=False, checks=Check.isin(TABLE_1_2_VALUE_VARS)),
+        "value": Column(int, nullable=False, checks=Check.ge(0)),
+        "metadata": Column(object, nullable=False),
+        "area_code": Column(str, nullable=False, checks=Check.isin(AREA_CODES)),
+        "geographic_level": Column(str, nullable=False, checks=Check.isin(GEOGRAPHIC_LEVELS)),
+        "change_from_previous_quarter": Column(float, nullable=True),
+        "pct_change_from_previous_quarter": Column(float, nullable=True),
+    },
+    strict=True,
+)

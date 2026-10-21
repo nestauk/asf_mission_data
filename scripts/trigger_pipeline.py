@@ -104,12 +104,24 @@ def get_app_container_image(
     raise ValueError("Task definition does not contain an 'app' container")
 
 
+def parse_image_uri(image_uri: str) -> tuple[str, str | None, str | None]:
+    """Split an image URI into (repository_uri, tag, digest); tag/digest are None when absent."""
+    digest = None
+    if "@" in image_uri:
+        image_uri, digest = image_uri.split("@", 1)
+    repository_uri, tag = image_uri, None
+    if ":" in image_uri.rsplit("/", 1)[-1]:
+        repository_uri, tag = image_uri.rsplit(":", 1)
+    return repository_uri, tag, digest
+
+
 def get_ecr_repository_name(image_uri: str) -> str:
-    image_without_tag = image_uri.rsplit(":", 1)[0]
-    return image_without_tag.rsplit("/", 1)[-1]
+    repository_uri, _, _ = parse_image_uri(image_uri)
+    return repository_uri.rsplit("/", 1)[-1]
 
 
-def ensure_image_tag_exists(image_uri: str, image_tag: str) -> None:
+def resolve_image_digest(image_uri: str, image_tag: str) -> str:
+    """Resolve a (mutable) ECR tag to its immutable digest, failing loudly if the tag doesn't exist."""
     ecr_client = boto3.client("ecr", region_name=AWS_REGION)
     repository_name = get_ecr_repository_name(image_uri)
     response = ecr_client.batch_get_image(
@@ -117,8 +129,9 @@ def ensure_image_tag_exists(image_uri: str, image_tag: str) -> None:
         imageIds=[{"imageTag": image_tag}],
     )
 
-    if response.get("images"):
-        return
+    images = response.get("images")
+    if images:
+        return images[0]["imageId"]["imageDigest"]
 
     failures = response.get("failures", [])
     if failures:
@@ -128,28 +141,29 @@ def ensure_image_tag_exists(image_uri: str, image_tag: str) -> None:
     raise ValueError(f"Could not find the image tag '{image_tag}' in ECR repository '{repository_name}'")
 
 
-def resolve_task_definition(image_tag: str, infra: InfraConfig, environment: str) -> ResolvedTaskDefinition:
+def resolve_task_definition(image_tag: str, infra: InfraConfig) -> ResolvedTaskDefinition:
     ecsclient = boto3.client("ecs", region_name=AWS_REGION)
     response = ecsclient.describe_task_definition(taskDefinition=infra.task_family)
     current = response["taskDefinition"]
 
-    if image_tag == f"{environment}-latest":
+    # Tags are mutable (dev-latest moves on every merge) and the family's
+    # active revision may be pinned to anything a previous run requested, so
+    # resolve the requested tag to its digest and compare digests — the only
+    # reference that can't silently drift.
+    current_app_image = get_app_container_image(current["containerDefinitions"])
+    repository_uri, _, current_digest = parse_image_uri(current_app_image)
+    requested_digest = resolve_image_digest(current_app_image, image_tag)
+
+    if current_digest == requested_digest:
         return ResolvedTaskDefinition(
             task_definition=current["taskDefinitionArn"],
-            app_image=get_app_container_image(current["containerDefinitions"]),
+            app_image=current_app_image,
         )
-
-    # Get the current task definition so we can copy its settings
-    # and derive the ECR registry URL without hardcoding it
-
-    current_app_image = get_app_container_image(current["containerDefinitions"])
-    ensure_image_tag_exists(current_app_image, image_tag)
 
     updated_containers = []
     for container in current["containerDefinitions"]:
         if container["name"] == "app":
-            base_uri = container["image"].rsplit(":", 1)[0]
-            container = {**container, "image": f"{base_uri}:{image_tag}"}
+            container = {**container, "image": f"{repository_uri}@{requested_digest}"}
         updated_containers.append(container)
 
     new_revision = ecsclient.register_task_definition(
@@ -239,16 +253,17 @@ if __name__ == "__main__":
         sys.exit(1)
 
     try:
-        resolved = resolve_task_definition(args.image_tag, infra, args.environment)
+        resolved = resolve_task_definition(args.image_tag, infra)
     except (BotoCoreError, ClientError, ValueError) as exc:
         emit_github_actions_annotation("error", f"Error resolving task definition: {exc}")
         print(f"Error resolving task definition: {exc}", file=sys.stderr)
         sys.exit(1)
 
     emit_github_actions_annotation("notice", f"Task definition: {resolved.task_definition}")
-    emit_github_actions_annotation("notice", f"Container image: {resolved.app_image}")
+    emit_github_actions_annotation("notice", f"Container image: {resolved.app_image} (requested tag: {args.image_tag})")
     print(f"Task definition: {resolved.task_definition}")
     print(f"Container image: {resolved.app_image}")
+    print(f"Requested tag:   {args.image_tag}")
     run_task(
         args.pipeline,
         args.stage,

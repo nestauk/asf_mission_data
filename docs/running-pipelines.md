@@ -28,6 +28,12 @@ uv run python -m asf_mission_data.run example --stage all
 
 This avoids Docker, ECS, and ECR entirely.
 
+> **Note:** `DATA_ROOT` can be an absolute or a relative path:
+> - `/tmp/pipeline-dev` (leading slash) is an absolute path, so data is written to the same place regardless of where you run the command.
+> - `tmp/pipeline-dev` (no leading slash) is relative to your current working directory, so data is written inside the folder you run the command from. If you change directory, the pipeline will look for (or create) a different `tmp/pipeline-dev`.
+>
+> If you use a relative path, remember not to commit those temporary files.
+
 ### Stages
 
 Pipelines have two or three stages: **bronze** (raw fetch), **silver** (clean and transform), and optionally **gold** (aggregated outputs). Use `--stage` to control which runs:
